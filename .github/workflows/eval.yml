@@ -221,7 +221,18 @@ jobs:
               mv history.json previous/history.json
               for page in $(jq -r '.entries[].page' previous/history.json); do
                 mkdir -p "previous/$(dirname "$page")"
-                curl --fail --silent --location --retry 3 --retry-all-errors "$base/$page" --output "previous/$page"
+                page_code="$(curl --fail --silent --location --retry 3 --retry-all-errors --output "previous/$page" --write-out '%{http_code}' "$base/$page" || true)"
+                case "$page_code" in
+                  200) ;;
+                  404)
+                    rm -f "previous/$page"
+                    echo "::warning::The page $page is not published any more; its entry leaves the history."
+                    ;;
+                  *)
+                    echo "::error::Could not read $page (HTTP $page_code). The site is not rebuilt, so the history is not shortened."
+                    exit 1
+                    ;;
+                esac
               done
               ;;
             404)
@@ -233,7 +244,6 @@ jobs:
               ;;
           esac
       - name: Build the report
-        if: ${{ !cancelled() }}
         env:
           COMPARE: ${{ needs.plan.outputs.compare }}
           PLAN: ${{ needs.plan.outputs.matrix }}
