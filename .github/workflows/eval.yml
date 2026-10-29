@@ -11,15 +11,15 @@ on:
       models:
         description: Model ids from models.yaml, comma-separated. Empty runs the models listed in the suite.
         type: string
-        default: ""
+        default: ''
       sdk_version:
-        description: "@qvac/sdk version or npm tag"
+        description: '@qvac/sdk version or npm tag'
         type: string
         default: latest
       compare_sdk_version:
         description: Optional second @qvac/sdk version. The run then compares the two on the same cases.
         type: string
-        default: ""
+        default: ''
       repeat:
         description: How many times every case runs
         type: number
@@ -30,7 +30,7 @@ on:
         options: [ubuntu-24.04, macos-15, both]
         default: ubuntu-24.04
   schedule:
-    - cron: "17 4 * * 1"
+    - cron: '17 4 * * 1'
 
 concurrency:
   group: eval-${{ github.ref }}

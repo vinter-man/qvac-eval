@@ -3,3 +3,6 @@ golden
 fixtures
 assets
 docs/remotion/out
+docs/remotion/src/data
+docs/remotion/public
+docs/remotion/package-lock.json
