@@ -16,7 +16,7 @@ import {
 } from '../../suites/load.js';
 import { resolveBaseline } from '../baseline.js';
 import { createStyle, formatBaselineRegressions, formatEvent, formatSummary } from '../console.js';
-import { firstExisting, resolveConfig } from '../inputs.js';
+import { displayPath, firstExisting, resolveConfig } from '../inputs.js';
 import { publish } from '../publish.js';
 import type { CliDeps } from '../deps.js';
 
@@ -149,7 +149,7 @@ export async function runCommand(
     print([
       '',
       ...[jsonFile, ...written.filter((file) => file !== options.summary)].map((file) =>
-        style.dim(`Wrote ${file}`),
+        style.dim(`Wrote ${displayPath(file, deps)}`),
       ),
     ]);
     return exitCodeFor(report.verdict);

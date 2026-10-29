@@ -10,7 +10,7 @@ import { applyBaseline } from '../../run/baseline.js';
 import { resolveBaseline } from '../baseline.js';
 import { createStyle, formatBaselineRegressions, formatSummary } from '../console.js';
 import type { CliDeps } from '../deps.js';
-import { resolveConfig } from '../inputs.js';
+import { displayPath, resolveConfig } from '../inputs.js';
 import { publish, type PublishLinks } from '../publish.js';
 import { publishSite } from '../site.js';
 
@@ -122,7 +122,7 @@ async function finish(
     ...formatBaselineRegressions(final, style),
     ...formatSummary(final, style),
     '',
-    ...written.map((file) => style.dim(`Wrote ${file}`)),
+    ...written.map((file) => style.dim(`Wrote ${displayPath(file, deps)}`)),
   ];
   deps.stdout.write(`${lines.join('\n')}\n`);
   return exitCodeFor(final.verdict);

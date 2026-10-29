@@ -1,5 +1,5 @@
 import { access } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { loadConfig } from '../suites/load.js';
 import type { EvalConfig } from '../suites/schema.js';
@@ -26,4 +26,9 @@ export async function resolveConfig(
       ? await firstExisting([join(deps.cwd, 'qvac-eval.config.yaml')])
       : resolve(deps.cwd, option);
   return loadConfig(file);
+}
+
+export function displayPath(file: string, deps: CliDeps): string {
+  const shown = relative(deps.cwd, file);
+  return shown === '' || shown.startsWith('..') || isAbsolute(shown) ? file : shown;
 }
