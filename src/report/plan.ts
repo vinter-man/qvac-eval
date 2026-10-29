@@ -70,12 +70,7 @@ export function jobsOf(plan: Plan, runner: string): Plan['include'] {
 export function expectPlan(groups: readonly RunReport[], plan: Plan, runner: string): RunReport[] {
   const [template] = groups;
   if (template === undefined) throw new UsageError('No reports to complete with the plan');
-  const entries = plan.include.filter((entry) => entry.runner === runner);
-  if (entries.length === 0) {
-    throw new UsageError(`The plan has no job for the runner "${runner}"`, [
-      ...new Set(plan.include.map((entry) => entry.runner)),
-    ]);
-  }
+  const entries = jobsOf(plan, runner);
   const versions = [
     ...new Set([
       ...groups.map((group) => group.environment.sdk.version),

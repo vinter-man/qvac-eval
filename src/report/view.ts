@@ -181,7 +181,7 @@ function verdictOf(report: RunReport, older: RunReport | undefined): ReportView[
   const base = `${summary.passed} of ${summary.total} cases passed on ${modelsRun} ${modelsRun === 1 ? 'model' : 'models'}`;
   if (report.verdict === 'error') {
     const own = report.models.some((run) => run.status === 'infra-error')
-      ? ' A model failed to load or the worker crashed, so this result is incomplete.'
+      ? ' A model did not finish, so this result is incomplete.'
       : '';
     const unfinishedOlder = (older?.models ?? [])
       .filter((run) => run.status === 'infra-error')

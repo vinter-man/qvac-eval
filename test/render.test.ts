@@ -314,7 +314,7 @@ describe('renderMarkdown', () => {
     });
     const view = buildView(newer, compareReports(older, newer, limits));
     expect(view.verdict.sentence).toBe(
-      '0 of 0 cases passed on 0 models. A model failed to load or the worker crashed, so this result is incomplete. The report of SDK 0.21.1 is incomplete (a), so the comparison is too.',
+      '0 of 0 cases passed on 0 models. A model did not finish, so this result is incomplete. The report of SDK 0.21.1 is incomplete (a), so the comparison is too.',
     );
   });
 
