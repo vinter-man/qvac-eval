@@ -1,0 +1,21 @@
+{
+  "older": "0.21.1",
+  "newer": "0.22.0",
+  "rows": [
+    {
+      "model": "smollm2-360m",
+      "older": 292.0406,
+      "newer": 266.5184
+    },
+    {
+      "model": "qwen3-0.6b",
+      "older": 338.0716,
+      "newer": 318.8057
+    },
+    {
+      "model": "llama-3.2-1b",
+      "older": 206.8076,
+      "newer": 210.4397
+    }
+  ]
+}
