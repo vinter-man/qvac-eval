@@ -219,7 +219,8 @@ jobs:
             200)
               mkdir -p previous
               mv history.json previous/history.json
-              for page in $(jq -r '.entries[].page' previous/history.json); do
+              pages="$(jq -r '.entries[].page' previous/history.json)"
+              for page in $pages; do
                 mkdir -p "previous/$(dirname "$page")"
                 page_code="$(curl --fail --silent --location --retry 3 --retry-all-errors --output "previous/$page" --write-out '%{http_code}' "$base/$page" || true)"
                 case "$page_code" in
