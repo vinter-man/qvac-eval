@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "suite": "completion",
+  "model": "llama-3.2-1b",
+  "sdk": "0.22.0",
+  "recordedAt": "2026-10-29T17:49:18.001Z",
+  "cases": {
+    "capital-fr": {
+      "kind": "completion",
+      "text": "Paris."
+    }
+  }
+}

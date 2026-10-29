@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "suite": "transcribe",
+  "model": "whisper-base-en",
+  "sdk": "0.22.0",
+  "recordedAt": "2026-10-29T17:49:22.494Z",
+  "cases": {
+    "jfk-keywords": {
+      "kind": "transcribe",
+      "text": " And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "suite": "completion",
+  "model": "qwen3-0.6b",
+  "sdk": "0.22.0",
+  "recordedAt": "2026-10-29T17:49:14.961Z",
+  "cases": {
+    "capital-fr": {
+      "kind": "completion",
+      "text": "France's capital is Paris."
+    }
+  }
+}

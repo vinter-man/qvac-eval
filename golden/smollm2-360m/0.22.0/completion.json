@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "suite": "completion",
+  "model": "smollm2-360m",
+  "sdk": "0.22.0",
+  "recordedAt": "2026-10-29T17:49:12.819Z",
+  "cases": {
+    "capital-fr": {
+      "kind": "completion",
+      "text": "The capital of France is Paris."
+    }
+  }
+}

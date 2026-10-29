@@ -3,7 +3,7 @@
   "suite": "smoke",
   "model": "embeddinggemma-300m",
   "sdk": "0.22.0",
-  "recordedAt": "2026-10-29T17:11:09.735Z",
+  "recordedAt": "2026-10-29T17:49:25.888Z",
   "cases": {
     "emb-similar": {
       "kind": "embed",
