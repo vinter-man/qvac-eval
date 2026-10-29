@@ -258,7 +258,7 @@ describe('renderMarkdown', () => {
     const markdown = renderMarkdown(buildView(report));
     const outsideCode = markdown
       .replace(/^(`{3,})[\s\S]*?^\1$/gmu, '')
-      .replace(/(`+)(?:(?!\1)[\s\S])+?\1/gu, '');
+      .replace(/(`+)(?:(?!\1)[^\n])+?\1/gu, '');
     expect(outsideCode).not.toMatch(/evil\.example|<img|# pwned|@some-team/u);
     expect(outsideCode.split('</details>').length - 1).toBe(1);
   });
@@ -277,7 +277,7 @@ describe('renderMarkdown', () => {
     const markdown = renderMarkdown(buildView(report));
     const outsideCode = markdown
       .replace(/^(`{3,})[\s\S]*?^\1$/gmu, '')
-      .replace(/(`+)(?:(?!\1)[\s\S])+?\1/gu, '');
+      .replace(/(`+)(?:(?!\1)[^\n])+?\1/gu, '');
     expect(outsideCode).not.toMatch(/evil\.example|# pwned/u);
     expect(outsideCode.split('</details>').length - 1).toBe(1);
     expect(markdown).toContain('`` `edge </details> # pwned ![x](https://evil.example/t.png)` ``');

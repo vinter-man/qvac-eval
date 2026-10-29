@@ -248,6 +248,10 @@ export function casesForModel(suite: SuiteDefinition, model: ResolvedModel): Cas
   );
 }
 
+function article(word: string): string {
+  return /^[aeiou]/u.test(word) ? 'an' : 'a';
+}
+
 export function modelsWithCases(
   suite: SuiteDefinition,
   models: readonly ResolvedModel[],
@@ -256,6 +260,17 @@ export function modelsWithCases(
     const cases = casesForModel(suite, model).length;
     return cases === 0 ? [] : [{ model, cases }];
   });
+}
+
+export function assertSomeModelHasCases(
+  suite: SuiteDefinition,
+  models: readonly ResolvedModel[],
+): void {
+  if (modelsWithCases(suite, models).length > 0) return;
+  throw new UsageError(
+    `None of the selected models has a case in the suite "${suite.suite}"`,
+    models.map((model) => `${model.id} (${model.kind})`),
+  );
 }
 
 export function assertCaseModelsKnown(
@@ -269,7 +284,9 @@ export function assertCaseModelsKnown(
       const at = `cases[${index}].models`;
       if (model === undefined) return [`${at}: "${id}" is not a known model`];
       if (caseKindByModelKind[model.kind] === testCase.kind) return [];
-      return [`${at}: "${id}" is a ${model.kind} model and cannot run a ${testCase.kind} case`];
+      return [
+        `${at}: "${id}" is ${article(model.kind)} ${model.kind} model and cannot run a ${testCase.kind} case`,
+      ];
     }),
   );
   if (problems.length > 0)

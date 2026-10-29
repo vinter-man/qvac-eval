@@ -1,9 +1,14 @@
 import type { Device, LoadStats, RunnerSession } from '../adapter/types.js';
-import { describeError, InfraError, UsageError } from '../errors.js';
+import { describeError, InfraError } from '../errors.js';
 import { distribution, sum } from '../metrics/stats.js';
 import type { CaseResult, ModelRun, Perf, RunReport } from '../report/schema.js';
 import { summarize, verdictFor } from '../report/summary.js';
-import { casesForModel, type LoadedSuite, type ResolvedModel } from '../suites/load.js';
+import {
+  assertSomeModelHasCases,
+  casesForModel,
+  type LoadedSuite,
+  type ResolvedModel,
+} from '../suites/load.js';
 import { TOOL_VERSION } from '../version.js';
 import type { CaseDefinition, EvalConfig } from '../suites/schema.js';
 import {
@@ -231,12 +236,7 @@ export async function runSuite(settings: RunSettings): Promise<RunReport> {
     model,
     cases: casesForModel(settings.suite.definition, model),
   }));
-  if (plan.every((entry) => entry.cases.length === 0)) {
-    throw new UsageError(
-      `None of the selected models has a case in the suite "${settings.suite.definition.suite}"`,
-      plan.map((entry) => `${entry.model.id} (${entry.model.kind})`),
-    );
-  }
+  assertSomeModelHasCases(settings.suite.definition, settings.models);
   await assertFixturesExist(
     plan.flatMap((entry) => entry.cases),
     settings.cwd,

@@ -8,7 +8,7 @@ import { UsageError } from '../src/errors.js';
 import { validateAgainstSchema } from '../src/metrics/json-schema.js';
 import { expectPlan, parsePlan } from '../src/report/plan.js';
 import { buildView } from '../src/report/view.js';
-import { formatGolden } from '../src/run/golden.js';
+import { formatGolden, saveGolden } from '../src/run/golden.js';
 import { runSuite } from '../src/run/execute.js';
 import { withDeadline, withTimeout } from '../src/run/timeout.js';
 import { loadConfig, loadSuite } from '../src/suites/load.js';
@@ -146,7 +146,6 @@ cases:
     const harness = await engine(suite, {
       'tiny-llm': { complete: () => completion('The capital of France is Paris!') },
     });
-    const { saveGolden } = await import('../src/run/golden.js');
     await saveGolden(join(harness.root, 'golden'), {
       schemaVersion: 1,
       suite: 'g',

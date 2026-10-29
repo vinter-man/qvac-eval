@@ -425,7 +425,7 @@ describe('guards before and after the run', () => {
     expect(await harness.run('run', 'cases/demo.yaml', '--models', 'tiny-embed')).toBe(2);
     expect(harness.stderr.join('')).toContain('None of the selected models has a case');
     expect(harness.session.calls).toEqual([]);
-    expect(harness.opened.length).toBe(1);
+    expect(harness.opened).toEqual([]);
   });
 
   it('checks an explicit baseline before it opens the SDK', async () => {
@@ -453,7 +453,7 @@ describe('guards before and after the run', () => {
     });
     expect(await wrongKind.run('run', 'cases/kind.yaml')).toBe(2);
     expect(wrongKind.stderr.join('')).toContain(
-      '"tiny-embed" is a embedding model and cannot run a completion case',
+      '"tiny-embed" is an embedding model and cannot run a completion case',
     );
   });
 });
@@ -505,6 +505,54 @@ describe('report with a plan', () => {
     const html = await readFile(join(harness.root, 'out.html'), 'utf8');
     expect(html).toContain('no report arrived from the job of tiny-embed on SDK 0.22.0');
     expect(html).toContain('<h1 class="hero-word" id="verdict">Error</h1>');
+  });
+
+  it('counts a missing report of the older SDK version in a comparison, not only the newer one', async () => {
+    const harness = await cli(good, {
+      files: {
+        'plan.json': JSON.stringify({
+          include: [
+            {
+              model: 'tiny-llm',
+              kind: 'llm',
+              source: 'TINY_LLM',
+              sdks: ['0.22.0', '0.21.1'],
+              runner: 'ubuntu-24.04',
+            },
+          ],
+        }),
+      },
+    });
+    await writeReport(
+      join(harness.root, 'in', 'new.json'),
+      makeReport([makeModel('tiny-llm', [makeCase('capital')])], { sdk: '0.22.0' }),
+    );
+    expect(
+      await harness.run(
+        'report',
+        'in',
+        '--plan',
+        'plan.json',
+        '--runner',
+        'ubuntu-24.04',
+        '--md',
+        'out.md',
+      ),
+    ).toBe(2);
+    const markdown = await readFile(join(harness.root, 'out.md'), 'utf8');
+    expect(markdown).toContain('## qvac-eval · smoke — Error');
+    expect(markdown).toContain('SDK 0.21.1 → 0.22.0');
+  });
+
+  it('refuses a runner that the plan has no job for', async () => {
+    const harness = await withPlan();
+    expect(
+      await harness.run('report', 'in', '--plan', 'plan.json', '--runner', 'windows-latest'),
+    ).toBe(2);
+    expect(harness.stderr.join('')).toContain(
+      'The plan has no job for the runner "windows-latest"',
+    );
+    expect(harness.stderr.join('')).toContain('ubuntu-24.04');
   });
 
   it('needs a runner with the plan and a readable plan file', async () => {

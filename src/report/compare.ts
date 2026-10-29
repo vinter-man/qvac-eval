@@ -107,7 +107,9 @@ export function compareReports(
   limits: Thresholds,
   source?: string,
 ): Comparison {
-  const annotated = applyBaseline(newer, older, limits, source);
+  const applied = applyBaseline(newer, older, limits, source);
+  const annotated: RunReport =
+    older.verdict === 'error' ? { ...applied, verdict: 'error' } : applied;
   const ids = [...new Set([...annotated.models, ...older.models].map((run) => run.model.id))];
   const find = (report: RunReport, id: string) => report.models.find((run) => run.model.id === id);
   return {

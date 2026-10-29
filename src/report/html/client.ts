@@ -21,8 +21,18 @@ export const CLIENT_SCRIPT = `
     });
   }
 
+  var openBeforePrint = [];
   window.addEventListener('beforeprint', function () {
-    Array.prototype.forEach.call(document.querySelectorAll('details.case'), function (row) { row.open = true; });
+    openBeforePrint = Array.prototype.map.call(document.querySelectorAll('details.case'), function (row) {
+      var was = row.open;
+      row.open = true;
+      return was;
+    });
+  });
+  window.addEventListener('afterprint', function () {
+    Array.prototype.forEach.call(document.querySelectorAll('details.case'), function (row, index) {
+      row.open = openBeforePrint[index] === true;
+    });
   });
 
   var filters = document.getElementById('filters');

@@ -10,7 +10,7 @@ import { applyBaseline } from '../../run/baseline.js';
 import { collectEnvironment } from '../../run/environment.js';
 import { runSuite } from '../../run/execute.js';
 import { withDeadline } from '../../run/timeout.js';
-import { loadSuite, selectModels } from '../../suites/load.js';
+import { assertSomeModelHasCases, loadSuite, selectModels } from '../../suites/load.js';
 import { assertBaselineExists, resolveBaseline } from '../baseline.js';
 import { createStyle, formatBaselineRegressions, formatEvent, formatSummary } from '../console.js';
 import { displayPath, firstExisting, loadModelCatalog, resolveConfig } from '../inputs.js';
@@ -61,6 +61,7 @@ export async function runCommand(
   const config = await resolveConfig(options.config, deps);
   const catalog = await loadModelCatalog(suite, options.modelsFile, deps);
   const models = selectModels(options.models, suite.definition, catalog);
+  assertSomeModelHasCases(suite.definition, models);
   if (options.baseline !== undefined) await assertBaselineExists(options.baseline, deps.cwd);
 
   const ownConfig = await firstExisting(
