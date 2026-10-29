@@ -12,6 +12,7 @@ import { createStyle, formatBaselineRegressions, formatSummary } from '../consol
 import type { CliDeps } from '../deps.js';
 import { resolveConfig } from '../inputs.js';
 import { publish, type PublishLinks } from '../publish.js';
+import { publishSite } from '../site.js';
 
 export interface ReportOptions {
   html?: string;
@@ -21,6 +22,9 @@ export interface ReportOptions {
   baseline?: string;
   config?: string;
   historyLink?: string;
+  site?: string;
+  previous?: string;
+  keep: number;
 }
 
 async function loadGroups(paths: readonly string[], deps: CliDeps): Promise<RunReport[]> {
@@ -87,6 +91,17 @@ async function finish(
     deps,
     links,
   );
+
+  if (options.site !== undefined) {
+    written.push(
+      ...(await publishSite(
+        view,
+        final,
+        { directory: options.site, previous: options.previous, keep: options.keep },
+        deps,
+      )),
+    );
+  }
 
   if (options.mergedDir !== undefined) {
     const directory = resolve(deps.cwd, options.mergedDir);

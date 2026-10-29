@@ -104,9 +104,15 @@ export interface Trend {
   change: string | undefined;
 }
 
-function sparkline(values: readonly number[], ceiling: number): Safe {
+function sparkline(values: readonly number[]): Safe {
   if (values.length === 0) return raw('');
-  const height = (value: number) => 19 - (value / ceiling) * 17;
+  const lowest = Math.min(...values);
+  const highest = Math.max(...values);
+  const span = highest - lowest;
+  const margin = span === 0 ? Math.max(1, highest * 0.1) : span * 0.15;
+  const floor = lowest - margin;
+  const range = highest + margin - floor;
+  const height = (value: number) => 19 - ((value - floor) / range) * 17;
   const last = Math.max(1, values.length - 1);
   const trace =
     values.length === 1
@@ -120,11 +126,10 @@ function sparkline(values: readonly number[], ceiling: number): Safe {
 }
 
 export function trendChart(trends: readonly Trend[], ariaLabel: string): Safe {
-  const ceiling = niceCeiling(Math.max(0, ...trends.flatMap((trend) => trend.values)));
   const rows = trends.map(
     (trend) => html`<div class="trend-row">
       <span class="bar-label">${trend.label}</span>
-      ${sparkline(trend.values, ceiling)}
+      ${sparkline(trend.values)}
       <span class="bar-value">${trend.latest}${trend.change === undefined ? null : html`<small class="mut"> ${trend.change}</small>`}</span>
     </div>`,
   );

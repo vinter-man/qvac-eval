@@ -31,6 +31,12 @@ function withReportOptions(command: Command): Command {
     .option('--summary <file>', 'append a Markdown summary to this file (for $GITHUB_STEP_SUMMARY)')
     .option('--merged-dir <dir>', 'write the merged JSON report of every SDK version here')
     .option('--history-link <href>', 'link the report back to a history page')
+    .option('--site <dir>', 'build a static site here: latest run, every run page and the history')
+    .option(
+      '--previous <dir>',
+      'the site as it was published last time, to carry its history forward',
+    )
+    .option('--keep <n>', 'how many runs the history keeps', parsePositiveInt, 40)
     .option('--config <file>', 'thresholds (default: ./qvac-eval.config.yaml if present)');
 }
 
