@@ -1,5 +1,10 @@
 import type { RunnerSession } from '../adapter/types.js';
-import { openQvacSession, type OpenSessionOptions } from '../adapter/sdk-loader.js';
+import {
+  defaultNpm,
+  openQvacSession,
+  type NpmRunner,
+  type OpenSessionOptions,
+} from '../adapter/sdk-loader.js';
 import { PACKAGE_ROOT } from '../paths.js';
 import { createDefaultSamplerFactory, type MemorySamplerFactory } from '../run/memory.js';
 
@@ -17,6 +22,7 @@ export interface CliDeps {
   packageRoot: string;
   signal: AbortSignal;
   openSession: (options: OpenSessionOptions) => Promise<RunnerSession>;
+  npm: NpmRunner;
   createSampler: MemorySamplerFactory;
 }
 
@@ -30,6 +36,7 @@ export function createDefaultDeps(signal: AbortSignal): CliDeps {
     packageRoot: PACKAGE_ROOT,
     signal,
     openSession: openQvacSession,
+    npm: defaultNpm,
     createSampler: createDefaultSamplerFactory(),
   };
 }

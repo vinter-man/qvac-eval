@@ -63,6 +63,7 @@ async function cli(
     packageRoot: repositoryRoot,
     signal: controller.signal,
     createSampler: noMemory,
+    npm: () => Promise.reject(new Error('npm is not available in tests')),
     openSession: (sessionOptions): Promise<RunnerSession> => {
       opened.push(sessionOptions);
       if (options.openFails !== undefined) return Promise.reject(options.openFails);

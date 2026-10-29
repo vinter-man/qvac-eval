@@ -1,0 +1,23 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommitTypeAll(chore)",
+    "schedule:weekly",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "rangeStrategy": "pin",
+  "minimumReleaseAge": "3 days",
+  "packageRules": [
+    {
+      "description": "typescript-eslint supports TypeScript below 6.1; type-aware linting fails on TypeScript 7.",
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<6.1"
+    },
+    {
+      "description": "Node.js is written as a version in .nvmrc and as a floor in engines; neither follows the latest release.",
+      "matchPackageNames": ["node"],
+      "enabled": false
+    }
+  ]
+}

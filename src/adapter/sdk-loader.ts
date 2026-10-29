@@ -74,8 +74,12 @@ export async function locateSdk(from: string): Promise<SdkLocation> {
   return { entry, version: (await readManifest(root)).version };
 }
 
-export async function resolveSdkVersion(spec: string, npm: NpmRunner): Promise<string> {
-  if (EXACT_VERSION.test(spec)) return spec;
+export async function resolveSdkVersion(
+  spec: string,
+  npm: NpmRunner,
+  options: { verify?: boolean } = {},
+): Promise<string> {
+  if (EXACT_VERSION.test(spec) && options.verify !== true) return spec;
   let output: string;
   try {
     output = await npm(['view', `${SDK_PACKAGE}@${spec}`, 'version', '--json']);

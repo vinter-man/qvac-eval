@@ -1,0 +1,271 @@
+name: Eval
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Suite to run
+        type: choice
+        options: [smoke, completion, embed, transcribe, hard]
+        default: smoke
+      models:
+        description: Model ids from models.yaml, comma-separated. Empty runs the models listed in the suite.
+        type: string
+        default: ""
+      sdk_version:
+        description: "@qvac/sdk version or npm tag"
+        type: string
+        default: latest
+      compare_sdk_version:
+        description: Optional second @qvac/sdk version. The run then compares the two on the same cases.
+        type: string
+        default: ""
+      repeat:
+        description: How many times every case runs
+        type: number
+        default: 1
+      runner:
+        description: Where to run
+        type: choice
+        options: [ubuntu-24.04, macos-15, both]
+        default: ubuntu-24.04
+  schedule:
+    - cron: "17 4 * * 1"
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      suite: ${{ steps.plan.outputs.suite }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      runners: ${{ steps.plan.outputs.runners }}
+      compare: ${{ steps.plan.outputs.compare }}
+      site_runner: ${{ steps.plan.outputs.site_runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - id: plan
+        env:
+          SUITE: ${{ inputs.suite || 'smoke' }}
+          MODELS: ${{ inputs.models }}
+          SDK: ${{ inputs.sdk_version || 'latest' }}
+          COMPARE_SDK: ${{ inputs.compare_sdk_version }}
+          RUNNER_CHOICE: ${{ inputs.runner || 'ubuntu-24.04' }}
+        run: |
+          sdks="$SDK"
+          if [ -n "$COMPARE_SDK" ]; then sdks="$SDK,$COMPARE_SDK"; fi
+          runners="$RUNNER_CHOICE"
+          if [ "$runners" = both ]; then runners="ubuntu-24.04,macos-15"; fi
+          args=(matrix "cases/${SUITE}.yaml" --sdk "$sdks" --runners "$runners")
+          if [ -n "$MODELS" ]; then args+=(--models "$MODELS"); fi
+          plan="$(node dist/cli/index.js "${args[@]}")"
+          jq . <<<"$plan"
+          {
+            echo "suite=$SUITE"
+            echo "matrix=$(jq -c '{include: .include}' <<<"$plan")"
+            echo "runners=$(jq -c .runners <<<"$plan")"
+            echo "compare=$(jq -r .compare <<<"$plan")"
+            echo "site_runner=$(jq -r '.runners[0]' <<<"$plan")"
+          } >> "$GITHUB_OUTPUT"
+
+  eval:
+    name: ${{ matrix.model }} · SDK ${{ matrix.sdk }} · ${{ matrix.runner }}
+    needs: plan
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      npm_config_cache: ${{ github.workspace }}/.npm-cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - id: npm-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .npm-cache
+          key: npm-${{ runner.os }}-${{ runner.arch }}-${{ matrix.sdk }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-${{ runner.arch }}-${{ matrix.sdk }}-
+            npm-${{ runner.os }}-${{ runner.arch }}-
+      - id: weights-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .qvac-eval/models
+          key: weights-${{ runner.os }}-${{ runner.arch }}-${{ matrix.model }}-${{ hashFiles('models.yaml') }}
+      - run: npm ci
+      - run: npm run build
+      - if: runner.os == 'Linux'
+        name: Make sure libatomic is present
+        run: |
+          if ! ldconfig -p | grep -q 'libatomic\.so\.1'; then
+            sudo apt-get update
+            sudo apt-get install --yes libatomic1
+          fi
+      - name: Run the suite
+        env:
+          SUITE: ${{ needs.plan.outputs.suite }}
+          MODEL: ${{ matrix.model }}
+          SDK: ${{ matrix.sdk }}
+          REPEAT: ${{ inputs.repeat || 1 }}
+        run: |
+          node dist/cli/index.js run "cases/${SUITE}.yaml" \
+            --models "$MODEL" \
+            --sdk-version "$SDK" \
+            --repeat "$REPEAT" \
+            --out reports \
+            --cache-dir .qvac-eval/models \
+            --summary "$GITHUB_STEP_SUMMARY"
+      - if: ${{ !cancelled() && steps.npm-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .npm-cache
+          key: ${{ steps.npm-cache.outputs.cache-primary-key }}
+      - if: ${{ !cancelled() && steps.weights-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .qvac-eval/models
+          key: ${{ steps.weights-cache.outputs.cache-primary-key }}
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: report-${{ matrix.model }}-${{ matrix.sdk }}-${{ matrix.runner }}
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 14
+
+  report:
+    name: Report · ${{ matrix.runner }}
+    needs: [plan, eval]
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(needs.plan.outputs.runners) }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SUITE: ${{ needs.plan.outputs.suite }}
+      RUNNER_LABEL: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: report-*-${{ matrix.runner }}
+          path: inputs
+      - if: needs.plan.outputs.compare != 'true'
+        name: Fetch the baseline from the last green run on main
+        run: |
+          for run_id in $(gh run list --workflow eval.yml --branch main --status success --limit 10 --json databaseId --jq '.[].databaseId'); do
+            if gh run download "$run_id" --name "merged-${SUITE}-${RUNNER_LABEL}" --dir baseline 2>/dev/null; then
+              echo "Baseline: run $run_id"
+              break
+            fi
+          done
+      - if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        name: Fetch the history published last time
+        run: |
+          base="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}"
+          if curl --fail --silent --show-error --location "$base/history.json" --output history.json; then
+            mkdir -p previous
+            mv history.json previous/history.json
+            for page in $(jq -r '.entries[].page' previous/history.json); do
+              mkdir -p "previous/$(dirname "$page")"
+              curl --fail --silent --location "$base/$page" --output "previous/$page" || true
+            done
+          fi
+      - name: Build the report
+        env:
+          COMPARE: ${{ needs.plan.outputs.compare }}
+        run: |
+          args=(report inputs --html out/report.html --md out/report.md --summary "$GITHUB_STEP_SUMMARY" --merged-dir out/merged --site out/site)
+          if [ "$COMPARE" != true ] && [ -d baseline ]; then args+=(--baseline baseline); fi
+          if [ -d previous ]; then args+=(--previous previous); fi
+          node dist/cli/index.js "${args[@]}"
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: report-html-${{ needs.plan.outputs.suite }}-${{ matrix.runner }}
+          path: |
+            out/report.html
+            out/report.md
+          if-no-files-found: ignore
+          retention-days: 30
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: merged-${{ needs.plan.outputs.suite }}-${{ matrix.runner }}
+          path: out/merged/
+          if-no-files-found: ignore
+          retention-days: 90
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: site-${{ matrix.runner }}
+          path: out/site/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  pages:
+    name: Publish to GitHub Pages
+    needs: [plan, report]
+    if: ${{ !cancelled() && needs.report.result != 'skipped' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: site-${{ needs.plan.outputs.site_runner }}
+          path: site
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

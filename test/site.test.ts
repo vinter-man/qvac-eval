@@ -173,6 +173,7 @@ describe('report --site', () => {
       packageRoot: root,
       signal: new AbortController().signal,
       createSampler: noMemory,
+      npm: () => Promise.reject(new Error('npm is not available in tests')),
       openSession: (): Promise<RunnerSession> => Promise.reject(new Error('not used')),
     };
     const save = async (name: string, report: RunReport) =>

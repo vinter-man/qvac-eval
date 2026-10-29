@@ -4,6 +4,7 @@ import { describeError, InfraError, UsageError } from '../errors.js';
 import { InterruptedError } from '../run/execute.js';
 import { TOOL_VERSION } from '../version.js';
 import { compareCommand, reportCommand, type ReportOptions } from './commands/report.js';
+import { matrixCommand, type MatrixOptions } from './commands/matrix.js';
 import { runCommand, type RunOptions } from './commands/run.js';
 import type { CliDeps } from './deps.js';
 
@@ -89,6 +90,30 @@ export function buildProgram(deps: CliDeps, setExit: (code: number) => void): Co
     .option('--verbose', 'show the SDK logs', false)
     .action(async (suite: string, options: RunOptions) => {
       setExit(await runCommand(suite, options, deps));
+    });
+
+  program
+    .command('matrix')
+    .description('Print the jobs of a CI matrix as JSON: one per model, SDK version and runner')
+    .argument('<suite>', 'path to a suite YAML file')
+    .option(
+      '--models <ids>',
+      'comma-separated model ids (default: the models listed in the suite)',
+      parseList,
+    )
+    .option(
+      '--sdk <versions>',
+      'one or two @qvac/sdk versions or tags, comma-separated',
+      parseList,
+      ['latest'],
+    )
+    .option('--runners <labels>', 'comma-separated runner labels', parseList, ['ubuntu-24.04'])
+    .option(
+      '--models-file <file>',
+      'model registry (default: ./models.yaml, then the built-in one)',
+    )
+    .action(async (suite: string, options: MatrixOptions) => {
+      setExit(await matrixCommand(suite, options, deps));
     });
 
   withReportOptions(

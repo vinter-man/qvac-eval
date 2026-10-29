@@ -51,8 +51,5 @@ export async function resolveBaseline(
   if (info.isFile()) return { report: await readReport(path), source: spec };
 
   const report = pickBaseline(await readLenient([path]), options.suite, options.sdkVersion);
-  if (report === undefined) {
-    throw new UsageError(`No report for the suite "${options.suite}" found in ${spec}`);
-  }
-  return { report, source: spec };
+  return report === undefined ? undefined : { report, source: spec };
 }
