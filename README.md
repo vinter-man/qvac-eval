@@ -191,7 +191,9 @@ npm i -D github:vinter-man/qvac-eval        # builds itself on install
 npx qvac-eval run cases/my-checks.yaml --sdk-version latest
 ```
 
-Keep your `cases/`, `golden/` and `models.yaml` in your repository and copy [`.github/workflows/eval.yml`](.github/workflows/eval.yml) next to them: it reads the suites from `cases/`, so only the paths in its `run` steps need to match your layout. `models.yaml` and `qvac-eval.config.yaml` are looked up in the working directory first and in the package second. The package is not on the npm registry.
+`models.yaml` is read from the working directory, else from the package. `qvac-eval.config.yaml` is read from the working directory, else the defaults that the shipped file spells out apply.
+
+The workflow in this repository is written for this repository. To reuse it, copy it and change three things: the install steps (`npm ci` installs your dependencies, qvac-eval among them, and there is no `npm run build`), the commands (`npx qvac-eval …` instead of `node dist/cli/index.js …`) and the `suite` choices. It also reads `.nvmrc` and hashes `models.yaml` for the weights cache, so keep both files. The package is not on the npm registry.
 
 ---
 

@@ -15,13 +15,13 @@ qvac-eval runs regression tests for local models through `@qvac/sdk`: YAML suite
 
 ## Commands
 
-| Command                                                     | What it does                                               |
-| ----------------------------------------------------------- | ---------------------------------------------------------- |
-| `npm run build`                                             | Compile `src` into `dist`                                  |
-| `npm run verify`                                            | Lint, type check, formatting, unit tests with coverage     |
-| `npm test`                                                  | Unit tests                                                 |
-| `node dist/cli/index.js run <suite>`                        | Run a suite; needs the SDK, which `--sdk-version` installs |
-| `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint` | Lint the workflows                                         |
+| Command                                                     | What it does                                                        |
+| ----------------------------------------------------------- | ------------------------------------------------------------------- |
+| `npm run build`                                             | Compile `src` into `dist`                                           |
+| `npm run verify`                                            | Lint, type check, formatting, unused code, unit tests with coverage |
+| `npm test`                                                  | Unit tests                                                          |
+| `node dist/cli/index.js run <suite>`                        | Run a suite; needs the SDK, which `--sdk-version` installs          |
+| `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint` | Lint the workflows                                                  |
 
 ## Layout
 
