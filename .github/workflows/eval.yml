@@ -127,7 +127,8 @@ jobs:
             sudo apt-get update
             sudo apt-get install --yes libatomic1
           fi
-      - name: Run the suite on every SDK version, one after the other on this machine
+      - id: run
+        name: Run the suite on every SDK version, one after the other on this machine
         env:
           SUITE: ${{ needs.plan.outputs.suite }}
           MODEL: ${{ matrix.model }}
@@ -146,13 +147,14 @@ jobs:
               --summary "$GITHUB_STEP_SUMMARY" || code=$?
             if [ "$code" -gt "$status" ]; then status=$code; fi
           done
+          echo "status=$status" >> "$GITHUB_OUTPUT"
           exit "$status"
       - if: ${{ !cancelled() && steps.npm-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .npm-cache
           key: ${{ steps.npm-cache.outputs.cache-primary-key }}
-      - if: ${{ !cancelled() && steps.weights-cache.outputs.cache-hit != 'true' }}
+      - if: ${{ !cancelled() && contains(fromJSON('["0", "1"]'), steps.run.outputs.status) && steps.weights-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .qvac-eval/models
@@ -160,9 +162,10 @@ jobs:
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: report-${{ matrix.model }}-${{ matrix.runner }}
+          name: eval-${{ matrix.model }}-${{ matrix.runner }}
           path: reports/
           if-no-files-found: warn
+          overwrite: true
           retention-days: 14
 
   report:
@@ -194,7 +197,7 @@ jobs:
       - run: npm run build
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: report-*-${{ matrix.runner }}
+          pattern: eval-*-${{ matrix.runner }}
           path: inputs
       - if: needs.plan.outputs.compare != 'true'
         name: Fetch the baseline from the last green run on main
@@ -205,24 +208,41 @@ jobs:
               break
             fi
           done
-      - if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      - id: history
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         name: Fetch the history published last time
+        continue-on-error: true
         run: |
           base="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}"
-          if curl --fail --silent --show-error --location "$base/history.json" --output history.json; then
-            mkdir -p previous
-            mv history.json previous/history.json
-            for page in $(jq -r '.entries[].page' previous/history.json); do
-              mkdir -p "previous/$(dirname "$page")"
-              curl --fail --silent --location "$base/$page" --output "previous/$page" || true
-            done
-          fi
+          code="$(curl --silent --location --retry 3 --retry-all-errors --output history.json --write-out '%{http_code}' "$base/history.json" || true)"
+          case "$code" in
+            200)
+              mkdir -p previous
+              mv history.json previous/history.json
+              for page in $(jq -r '.entries[].page' previous/history.json); do
+                mkdir -p "previous/$(dirname "$page")"
+                curl --fail --silent --location --retry 3 --retry-all-errors "$base/$page" --output "previous/$page"
+              done
+              ;;
+            404)
+              echo "No history is published yet; this run starts it."
+              ;;
+            *)
+              echo "::error::Could not read the published history (HTTP $code). The site is not rebuilt, so the history is not replaced by one run."
+              exit 1
+              ;;
+          esac
       - name: Build the report
+        if: ${{ !cancelled() }}
         env:
           COMPARE: ${{ needs.plan.outputs.compare }}
+          PLAN: ${{ needs.plan.outputs.matrix }}
+          HISTORY_FAILED: ${{ steps.history.outcome == 'failure' }}
         run: |
-          args=(report inputs --html out/report.html --md out/report.md --summary "$GITHUB_STEP_SUMMARY" --merged-dir out/merged --site out/site)
+          printf '%s' "$PLAN" > plan.json
+          args=(report inputs --plan plan.json --runner "$RUNNER_LABEL" --html out/report.html --md out/report.md --summary "$GITHUB_STEP_SUMMARY" --merged-dir out/merged)
           if [ "$COMPARE" != true ] && [ -d baseline ]; then args+=(--baseline baseline); fi
+          if [ "$HISTORY_FAILED" != true ]; then args+=(--site out/site); fi
           if [ -d previous ]; then args+=(--previous previous); fi
           node dist/cli/index.js "${args[@]}"
       - if: ${{ !cancelled() }}
@@ -233,6 +253,7 @@ jobs:
             out/report.html
             out/report.md
           if-no-files-found: ignore
+          overwrite: true
           retention-days: 30
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -240,13 +261,15 @@ jobs:
           name: merged-${{ needs.plan.outputs.suite }}-${{ matrix.runner }}
           path: out/merged/
           if-no-files-found: ignore
+          overwrite: true
           retention-days: 90
-      - if: ${{ !cancelled() }}
+      - if: ${{ !cancelled() && steps.history.outcome != 'failure' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: site-${{ matrix.runner }}
           path: out/site/
           if-no-files-found: ignore
+          overwrite: true
           retention-days: 7
 
   pages:
