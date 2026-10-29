@@ -8,6 +8,13 @@ export class UsageError extends Error {
   }
 }
 
+export class NoReportsError extends UsageError {
+  constructor(message: string, details: readonly string[] = []) {
+    super(message, details);
+    this.name = 'NoReportsError';
+  }
+}
+
 export class InfraError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);

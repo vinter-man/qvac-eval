@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-import { isNotFound, UsageError } from '../../errors.js';
+import { isNotFound, NoReportsError, UsageError } from '../../errors.js';
 import { loadReports, mergeReports, writeReport } from '../../report/io.js';
-import { expectPlan, parsePlan } from '../../report/plan.js';
+import { expectPlan, jobsOf, parsePlan } from '../../report/plan.js';
 import { compareReports, type Comparison } from '../../report/compare.js';
 import type { RunReport } from '../../report/schema.js';
 import { exitCodeFor } from '../../report/summary.js';
@@ -150,12 +150,12 @@ export async function reportCommand(
   if (options.plan === undefined) return finish(await loadGroups(inputs, deps), options, deps);
   if (options.runner === undefined) throw new UsageError('--plan needs --runner to pick its jobs');
   const plan = parsePlan(await readPlanFile(options.plan, deps), options.plan);
-  const jobs = plan.include.filter((entry) => entry.runner === options.runner);
+  const jobs = jobsOf(plan, options.runner);
   let groups: RunReport[];
   try {
     groups = await loadGroups(inputs, deps);
   } catch (error) {
-    if (!(error instanceof UsageError)) throw error;
+    if (!(error instanceof NoReportsError)) throw error;
     throw new UsageError(
       `No report arrived from any of the ${jobs.length} planned jobs of ${options.runner}`,
       [error.message, ...jobs.map((entry) => `${entry.model} on SDK ${entry.sdks.join(', ')}`)],

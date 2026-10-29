@@ -305,6 +305,19 @@ describe('renderMarkdown', () => {
     });
   });
 
+  it('names both sides when the newer and the older report are incomplete', () => {
+    const older = makeReport([makeModel('a', [], {}, { status: 'infra-error', note: 'x' })], {
+      sdk: '0.21.1',
+    });
+    const newer = makeReport([makeModel('b', [], {}, { status: 'infra-error', note: 'y' })], {
+      sdk: '0.22.0',
+    });
+    const view = buildView(newer, compareReports(older, newer, limits));
+    expect(view.verdict.sentence).toBe(
+      '0 of 0 cases passed on 0 models. A model failed to load or the worker crashed, so this result is incomplete. The report of SDK 0.21.1 is incomplete (a), so the comparison is too.',
+    );
+  });
+
   it('shows a model that could not run instead of empty numbers', () => {
     const report = makeReport([
       makeModel(

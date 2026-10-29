@@ -179,23 +179,18 @@ function verdictOf(report: RunReport, older: RunReport | undefined): ReportView[
   const { summary } = report;
   const modelsRun = report.models.filter((run) => run.status === 'completed').length;
   const base = `${summary.passed} of ${summary.total} cases passed on ${modelsRun} ${modelsRun === 1 ? 'model' : 'models'}`;
-  const unfinished = report.models.some((run) => run.status === 'infra-error');
-  if (report.verdict === 'error' && !unfinished && older !== undefined) {
-    const missing = older.models
+  if (report.verdict === 'error') {
+    const own = report.models.some((run) => run.status === 'infra-error')
+      ? ' A model failed to load or the worker crashed, so this result is incomplete.'
+      : '';
+    const unfinishedOlder = (older?.models ?? [])
       .filter((run) => run.status === 'infra-error')
       .map((run) => run.model.id);
-    return {
-      word: 'Error',
-      tone: 'error',
-      sentence: `${base}. The report of SDK ${older.environment.sdk.version} is incomplete (${missing.join(', ')}), so the comparison is too.`,
-    };
-  }
-  if (report.verdict === 'error') {
-    return {
-      word: 'Error',
-      tone: 'error',
-      sentence: `${base}. A model failed to load or the worker crashed, so this result is incomplete.`,
-    };
+    const theirs =
+      older === undefined || unfinishedOlder.length === 0
+        ? ''
+        : ` The report of SDK ${older.environment.sdk.version} is incomplete (${unfinishedOlder.join(', ')}), so the comparison is too.`;
+    return { word: 'Error', tone: 'error', sentence: `${base}.${own}${theirs}` };
   }
   if (report.verdict === 'pass') return { word: 'Passed', tone: 'pass', sentence: `${base}.` };
 

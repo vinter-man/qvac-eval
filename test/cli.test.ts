@@ -554,6 +554,16 @@ describe('report with a plan', () => {
     expect(message).toContain('tiny-embed on SDK 0.22.0');
   });
 
+  it('keeps the real cause when reports did arrive but cannot be used', async () => {
+    const harness = await withPlan();
+    await writeFile(join(harness.root, 'in', 'broken.json'), '{"hello": 1}');
+    expect(
+      await harness.run('report', 'in', '--plan', 'plan.json', '--runner', 'ubuntu-24.04'),
+    ).toBe(2);
+    expect(harness.stderr.join('')).toContain('is not a qvac-eval report');
+    expect(harness.stderr.join('')).not.toContain('No report arrived from any');
+  });
+
   it('refuses a runner that the plan has no job for', async () => {
     const harness = await withPlan();
     expect(

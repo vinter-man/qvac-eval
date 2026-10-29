@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { isNotFound, UsageError } from '../errors.js';
+import { isNotFound, NoReportsError, UsageError } from '../errors.js';
 import { compareVersions } from '../run/golden.js';
 import { runReportSchema, type RunReport } from './schema.js';
 import { summarize, verdictFor } from './summary.js';
@@ -67,7 +67,7 @@ export async function expandReportPaths(paths: readonly string[]): Promise<strin
     try {
       info = await stat(path);
     } catch {
-      throw new UsageError(`Cannot read report ${path}: file not found`);
+      throw new NoReportsError(`Cannot read report ${path}: file not found`);
     }
     if (info.isDirectory()) files.push(...(await jsonFilesIn(path, 2)));
     else files.push(path);
@@ -77,7 +77,7 @@ export async function expandReportPaths(paths: readonly string[]): Promise<strin
 
 export async function loadReports(paths: readonly string[]): Promise<RunReport[]> {
   const files = await expandReportPaths(paths);
-  if (files.length === 0) throw new UsageError('No report files found', [...paths]);
+  if (files.length === 0) throw new NoReportsError('No report files found', [...paths]);
   return Promise.all(files.map((file) => readReport(file)));
 }
 
