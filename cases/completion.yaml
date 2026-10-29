@@ -1,0 +1,83 @@
+suite: completion
+description: Instruction following, constrained output, determinism and throughput for small chat models.
+models: [smollm2-360m, qwen3-0.6b, llama-3.2-1b]
+defaults:
+  temperature: 0
+  seed: 42
+  maxTokens: 48
+  timeoutMs: 90000
+cases:
+  - id: capital-fr
+    kind: completion
+    input: Capital of France? One word.
+    expect:
+      contains: [Paris]
+      golden: true
+
+  - id: arithmetic
+    kind: completion
+    input: What is 2+2? Reply with the digit only.
+    expect:
+      regex: \b4\b
+
+  - id: round-earth
+    kind: completion
+    input: Is the Earth round or flat? One word.
+    expect:
+      contains: [round]
+      notContains: [flat earth is]
+
+  - id: primary-color
+    kind: completion
+    input: Name a primary color. One word.
+    expect:
+      regex: red|blue|yellow
+
+  - id: system-prompt
+    kind: completion
+    input:
+      - role: system
+        content: Answer only in UPPERCASE letters.
+      - role: user
+        content: Say hello.
+    expect:
+      regex: ^[^a-z]+$
+      caseSensitive: true
+
+  - id: json-constrained
+    kind: completion
+    input: Return a JSON object with the key "ok" set to true.
+    responseFormat:
+      jsonSchema: &ok-schema
+        type: object
+        required: [ok]
+        properties:
+          ok: { type: boolean }
+        additionalProperties: false
+    expect:
+      jsonSchema: *ok-schema
+
+  - id: json-object-mode
+    kind: completion
+    input: Give a JSON object with the keys "city" and "country" for Paris.
+    responseFormat: json_object
+    expect:
+      jsonSchema:
+        type: object
+
+  - id: deterministic
+    kind: completion
+    description: Same prompt, temperature 0, same seed - the output must not change between runs.
+    input: Name three fruits.
+    expect:
+      deterministic: true
+
+  - id: throughput
+    kind: completion
+    description: Forces 64 generated tokens so tokens per second is measured on a long enough run.
+    input: Count from 1 to 100, separated by commas.
+    generation:
+      maxTokens: 64
+    expect:
+      contains: ['1, 2, 3']
+      minTokensPerSecond: 1

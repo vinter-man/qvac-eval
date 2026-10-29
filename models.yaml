@@ -1,0 +1,39 @@
+models:
+  smollm2-360m:
+    kind: llm
+    source: SMOLLM2_360M_INST_Q8
+    license: Apache-2.0
+    sizeMb: 386
+    homepage: https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct
+  qwen3-0.6b:
+    kind: llm
+    source: QWEN3_600M_INST_Q4
+    license: Apache-2.0
+    sizeMb: 382
+    homepage: https://huggingface.co/Qwen/Qwen3-0.6B
+    generation:
+      reasoningBudget: 0
+  llama-3.2-1b:
+    kind: llm
+    source: LLAMA_3_2_1B_INST_Q4_0
+    license: Llama 3.2 Community License
+    sizeMb: 773
+    homepage: https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct
+  embeddinggemma-300m:
+    kind: embedding
+    source: EMBEDDINGGEMMA_300M_Q4_0
+    license: Gemma Terms of Use
+    sizeMb: 278
+    homepage: https://huggingface.co/google/embeddinggemma-300m
+  whisper-tiny-en:
+    kind: asr
+    source: WHISPER_EN_TINY_Q8_0
+    license: Apache-2.0
+    sizeMb: 44
+    homepage: https://huggingface.co/openai/whisper-tiny.en
+  whisper-base-en:
+    kind: asr
+    source: WHISPER_EN_BASE_Q8_0
+    license: Apache-2.0
+    sizeMb: 82
+    homepage: https://huggingface.co/openai/whisper-base.en

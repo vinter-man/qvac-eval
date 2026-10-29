@@ -1,0 +1,38 @@
+suite: hard
+description: Cases that small models get wrong in different ways. Run it to see what a failing report looks like.
+models: [smollm2-360m, qwen3-0.6b, llama-3.2-1b]
+defaults:
+  temperature: 0
+  seed: 42
+  maxTokens: 32
+  timeoutMs: 90000
+cases:
+  - id: multiplication
+    kind: completion
+    input: What is 17 * 23? Digits only.
+    expect:
+      regex: \b391\b
+
+  - id: name-recall
+    kind: completion
+    input:
+      - role: user
+        content: My name is Ada.
+      - role: assistant
+        content: Nice to meet you, Ada.
+      - role: user
+        content: What is my name? One word.
+    expect:
+      contains: [Ada]
+
+  - id: translate-cat
+    kind: completion
+    input: 'Translate to French: cat. One word.'
+    expect:
+      exact: chat
+
+  - id: reverse-string
+    kind: completion
+    input: Reverse the string "qvac" letter by letter. Reply with the result only.
+    expect:
+      exact: cavq

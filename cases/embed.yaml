@@ -1,0 +1,42 @@
+suite: embed
+description: Dimensions, normalisation, similarity order and stability of text embeddings.
+models: [embeddinggemma-300m]
+defaults:
+  timeoutMs: 60000
+cases:
+  - id: dims
+    kind: embed
+    models: [embeddinggemma-300m]
+    input:
+      - Hello, world!
+    expect:
+      dims: 768
+      normalized: true
+
+  - id: paraphrase
+    kind: embed
+    input:
+      - The cat sits on the mat
+      - A cat is sitting on a mat
+    expect:
+      cosineMin: 0.85
+      golden: true
+
+  - id: unrelated
+    kind: embed
+    input:
+      - The cat sits on the mat
+      - Quarterly revenue grew by twelve percent
+    expect:
+      cosineMax: 0.6
+
+  - id: ranking
+    kind: embed
+    input:
+      - How do I reset my password?
+      - I forgot my login credentials
+      - What is the weather in Berlin today?
+    expect:
+      ranking:
+        - { closer: [0, 1], than: [0, 2] }
+      golden: true

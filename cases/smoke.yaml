@@ -1,0 +1,62 @@
+suite: smoke
+description: One quick check per capability. A couple of minutes on a CPU runner.
+models: [smollm2-360m, embeddinggemma-300m, whisper-tiny-en]
+defaults:
+  temperature: 0
+  seed: 42
+  maxTokens: 48
+  timeoutMs: 90000
+cases:
+  - id: capital-fr
+    kind: completion
+    input:
+      - role: user
+        content: Capital of France? One word.
+    expect:
+      contains: [Paris]
+      maxLatencyMs: 20000
+      golden: true
+
+  - id: json-constrained
+    kind: completion
+    input: Return a JSON object with the key "ok" set to true.
+    responseFormat:
+      jsonSchema: &ok-schema
+        type: object
+        required: [ok]
+        properties:
+          ok: { type: boolean }
+        additionalProperties: false
+    expect:
+      jsonSchema: *ok-schema
+
+  - id: throughput
+    kind: completion
+    description: Forces 64 generated tokens so tokens per second is measured on a long enough run.
+    input: Count from 1 to 100, separated by commas.
+    generation:
+      maxTokens: 64
+    expect:
+      contains: ['1, 2, 3']
+
+  - id: emb-similar
+    kind: embed
+    input:
+      - The cat sits on the mat
+      - A cat is sitting on a mat
+      - Quarterly revenue grew by twelve percent
+    expect:
+      normalized: true
+      cosineMin: 0.8
+      ranking:
+        - { closer: [0, 1], than: [0, 2] }
+      golden: true
+
+  - id: asr-jfk
+    kind: transcribe
+    input: fixtures/audio/jfk.wav
+    expect:
+      reference: And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.
+      werMax: 0.15
+      maxRealTimeFactor: 1
+      golden: true

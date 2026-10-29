@@ -1,0 +1,20 @@
+suite: transcribe
+description: Speech to text on a public-domain clip, scored by word error rate.
+models: [whisper-tiny-en]
+defaults:
+  timeoutMs: 120000
+cases:
+  - id: jfk-wer
+    kind: transcribe
+    input: fixtures/audio/jfk.wav
+    expect:
+      reference: And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.
+      werMax: 0.15
+      maxRealTimeFactor: 1
+
+  - id: jfk-keywords
+    kind: transcribe
+    input: fixtures/audio/jfk.wav
+    expect:
+      contains: [fellow Americans, your country]
+      golden: true

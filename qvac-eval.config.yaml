@@ -1,0 +1,16 @@
+thresholds:
+  tokensPerSecondDropPct: 15
+  ttftIncreasePct: 50
+  latencyP95IncreasePct: 50
+  loadTimeIncreasePct: 100
+  peakRssIncreasePct: 25
+  werIncrease: 0.05
+  cosineDrop: 0.02
+  goldenSimilarityDrop: 0.1
+golden:
+  dir: golden
+  minSimilarity: 0.85
+  minCosine: 0.98
+timeouts:
+  loadMs: 600000
+  caseMs: 60000
