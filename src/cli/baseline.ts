@@ -31,6 +31,12 @@ async function readLenient(paths: readonly string[]): Promise<RunReport[]> {
   return reports;
 }
 
+export async function assertBaselineExists(spec: string, cwd: string): Promise<void> {
+  if (spec !== 'latest' && !(await exists(resolve(cwd, spec)))) {
+    throw new UsageError(`Baseline not found: ${spec}`);
+  }
+}
+
 export async function resolveBaseline(
   spec: string,
   options: { cwd: string; outDir: string; suite: string; sdkVersion: string },
@@ -45,8 +51,8 @@ export async function resolveBaseline(
     return report === undefined ? undefined : { report, source: options.outDir };
   }
 
+  await assertBaselineExists(spec, options.cwd);
   const path = resolve(options.cwd, spec);
-  if (!(await exists(path))) throw new UsageError(`Baseline not found: ${spec}`);
   const info = await stat(path);
   if (info.isFile()) return { report: await readReport(path), source: spec };
 

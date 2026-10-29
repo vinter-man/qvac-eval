@@ -14,6 +14,16 @@ import {
 } from '../src/suites/load.js';
 import { makeWorkspace, MODELS_YAML, SUITE_YAML } from './support/workspace.js';
 
+function thrown(action: () => unknown): UsageError {
+  try {
+    action();
+  } catch (error) {
+    if (error instanceof UsageError) return error;
+    throw error;
+  }
+  throw new Error('Expected the call to throw');
+}
+
 async function suiteError(yaml: string): Promise<UsageError> {
   const root = await makeWorkspace({ 'suite.yaml': yaml });
   try {
@@ -190,12 +200,9 @@ cases:
     const registry = await loadModelRegistry(join(root, 'models.yaml'));
     const { definition } = await loadSuite(join(root, 'suite.yaml'));
     const catalog = buildModelCatalog(registry, definition);
-    expect(() => selectModels(['nope'], definition, catalog)).toThrow(UsageError);
-    try {
-      selectModels(['nope'], definition, catalog);
-    } catch (error) {
-      expect((error as UsageError).details[0]).toContain('tiny-llm, tiny-embed, tiny-asr');
-    }
+    const error = thrown(() => selectModels(['nope'], definition, catalog));
+    expect(error.message).toBe('Unknown model "nope"');
+    expect(error.details[0]).toContain('tiny-llm, tiny-embed, tiny-asr');
   });
 
   it('refuses a model listed twice and a suite with no models', async () => {

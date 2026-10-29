@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { parseDocument } from 'yaml';
 import type { z } from 'zod';
 
-import { describeError, UsageError } from '../errors.js';
+import { describeError, isNotFound, UsageError } from '../errors.js';
 import { assertCompilableSchema } from '../metrics/json-schema.js';
 import {
   configSchema,
@@ -37,7 +37,7 @@ export interface ResolvedModel {
   generation: Generation;
 }
 
-export const caseKindByModelKind = {
+const caseKindByModelKind = {
   llm: 'completion',
   embedding: 'embed',
   asr: 'transcribe',
@@ -57,8 +57,7 @@ async function parseYamlFile<S extends z.ZodType>(file: string, schema: S): Prom
   try {
     text = await readFile(file, 'utf8');
   } catch (error) {
-    const reason =
-      (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'file not found' : String(error);
+    const reason = isNotFound(error) ? 'file not found' : String(error);
     throw new UsageError(`Cannot read ${file}: ${reason}`);
   }
 
@@ -247,4 +246,32 @@ export function casesForModel(suite: SuiteDefinition, model: ResolvedModel): Cas
       testCase.kind === caseKindByModelKind[model.kind] &&
       (testCase.models === undefined || testCase.models.includes(model.id)),
   );
+}
+
+export function modelsWithCases(
+  suite: SuiteDefinition,
+  models: readonly ResolvedModel[],
+): { model: ResolvedModel; cases: number }[] {
+  return models.flatMap((model) => {
+    const cases = casesForModel(suite, model).length;
+    return cases === 0 ? [] : [{ model, cases }];
+  });
+}
+
+export function assertCaseModelsKnown(
+  file: string,
+  suite: SuiteDefinition,
+  catalog: ReadonlyMap<string, ResolvedModel>,
+): void {
+  const problems = suite.cases.flatMap((testCase, index) =>
+    (testCase.models ?? []).flatMap((id) => {
+      const model = catalog.get(id);
+      const at = `cases[${index}].models`;
+      if (model === undefined) return [`${at}: "${id}" is not a known model`];
+      if (caseKindByModelKind[model.kind] === testCase.kind) return [];
+      return [`${at}: "${id}" is a ${model.kind} model and cannot run a ${testCase.kind} case`];
+    }),
+  );
+  if (problems.length > 0)
+    throw new UsageError(`${file} names models that cannot run its cases`, problems);
 }

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { modelKindSchema } from '../suites/schema.js';
 
-export const caseStatusSchema = z.enum(['passed', 'failed', 'regressed', 'errored']);
+const caseStatusSchema = z.enum(['passed', 'failed', 'regressed', 'errored']);
 export type CaseStatus = z.infer<typeof caseStatusSchema>;
 
 const distributionSchema = z.strictObject({ p50: z.number(), p95: z.number() });
@@ -16,7 +16,7 @@ const checkSchema = z.strictObject({
 });
 export type CheckResult = z.infer<typeof checkSchema>;
 
-export const regressionSchema = z.strictObject({
+const regressionSchema = z.strictObject({
   source: z.enum(['golden', 'baseline']),
   metric: z.string(),
   message: z.string(),
@@ -45,12 +45,13 @@ const caseErrorSchema = z.strictObject({
 const diffSchema = z.strictObject({ expected: z.string(), actual: z.string() });
 export type Diff = z.infer<typeof diffSchema>;
 
-export const caseResultSchema = z.strictObject({
+const caseResultSchema = z.strictObject({
   id: z.string(),
   kind: z.enum(['completion', 'embed', 'transcribe']),
   description: z.string().optional(),
   status: caseStatusSchema,
   attempts: z.int().positive(),
+  golden: z.enum(['compared', 'missing']).optional(),
   checks: z.array(checkSchema),
   regressions: z.array(regressionSchema),
   metrics: caseMetricsSchema.optional(),
@@ -60,7 +61,7 @@ export const caseResultSchema = z.strictObject({
 });
 export type CaseResult = z.infer<typeof caseResultSchema>;
 
-export const perfSchema = z.strictObject({
+const perfSchema = z.strictObject({
   loadMs: z.number(),
   downloadMs: z.number().optional(),
   ttftMs: distributionSchema.optional(),
@@ -70,7 +71,7 @@ export const perfSchema = z.strictObject({
 });
 export type Perf = z.infer<typeof perfSchema>;
 
-export const modelRunSchema = z.strictObject({
+const modelRunSchema = z.strictObject({
   model: z.strictObject({
     id: z.string(),
     kind: modelKindSchema,

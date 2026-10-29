@@ -1,16 +1,10 @@
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 import { resolveSdkVersion } from '../../adapter/sdk-loader.js';
 import { UsageError } from '../../errors.js';
-import {
-  buildModelCatalog,
-  casesForModel,
-  loadModelRegistry,
-  loadSuite,
-  selectModels,
-} from '../../suites/load.js';
+import { loadSuite, modelsWithCases, selectModels } from '../../suites/load.js';
 import type { CliDeps } from '../deps.js';
-import { firstExisting } from '../inputs.js';
+import { loadModelCatalog } from '../inputs.js';
 
 export interface MatrixOptions {
   models?: string[];
@@ -19,15 +13,16 @@ export interface MatrixOptions {
   modelsFile?: string;
 }
 
-export interface MatrixEntry {
+interface MatrixEntry {
   model: string;
   kind: string;
+  source: string;
   cases: number;
   sdks: string[];
   runner: string;
 }
 
-export interface MatrixPlan {
+interface MatrixPlan {
   suite: string;
   compare: boolean;
   sdks: string[];
@@ -35,25 +30,16 @@ export interface MatrixPlan {
   include: MatrixEntry[];
 }
 
-export async function planMatrix(
+async function planMatrix(
   suiteArgument: string,
   options: MatrixOptions,
   deps: CliDeps,
 ): Promise<MatrixPlan> {
   const suite = await loadSuite(resolve(deps.cwd, suiteArgument));
-  const registryFile =
-    options.modelsFile === undefined
-      ? await firstExisting([join(deps.cwd, 'models.yaml'), join(deps.packageRoot, 'models.yaml')])
-      : resolve(deps.cwd, options.modelsFile);
-  const registry =
-    registryFile === undefined ? { models: {} } : await loadModelRegistry(registryFile);
-  const catalog = buildModelCatalog(registry, suite.definition);
+  const catalog = await loadModelCatalog(suite, options.modelsFile, deps);
   const models = selectModels(options.models, suite.definition, catalog);
 
-  const eligible = models.flatMap((model) => {
-    const cases = casesForModel(suite.definition, model).length;
-    return cases === 0 ? [] : [{ model, cases }];
-  });
+  const eligible = modelsWithCases(suite.definition, models);
   if (eligible.length === 0) {
     throw new UsageError(
       `None of the models has a case in the suite "${suite.definition.suite}"`,
@@ -87,6 +73,7 @@ export async function planMatrix(
       eligible.map(({ model, cases }) => ({
         model: model.id,
         kind: model.kind,
+        source: model.source,
         cases,
         sdks,
         runner,

@@ -35,7 +35,7 @@ export interface FakeSession extends RunnerSession {
   closed: boolean;
 }
 
-export const OK_LOAD: LoadStats = { loadMs: 120 };
+const OK_LOAD: LoadStats = { loadMs: 120 };
 
 export function completion(text: string, extra: Partial<CompletionOutput> = {}): CompletionOutput {
   return { text, wallMs: 40, ttftMs: 10, tokensPerSecond: 200, generatedTokens: 20, ...extra };

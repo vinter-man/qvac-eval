@@ -11,7 +11,7 @@ const entryModelSchema = z.strictObject({
   latencyP50Ms: z.number().optional(),
 });
 
-export const historyEntrySchema = z.strictObject({
+const historyEntrySchema = z.strictObject({
   id: z.string(),
   startedAt: z.iso.datetime(),
   suite: z.string(),

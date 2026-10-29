@@ -157,6 +157,7 @@ export class QvacRunner implements ModelRunner {
         responseFormat: toSdkResponseFormat(request.responseFormat),
       }),
     });
+    run.final.catch(() => undefined);
     const stop = this.cancelOnAbort(signal, run.requestId);
     try {
       let firstTokenAt: number | undefined;
@@ -175,7 +176,6 @@ export class QvacRunner implements ModelRunner {
         ...(ttftMs !== undefined && { ttftMs }),
         ...(stats?.tokensPerSecond !== undefined && { tokensPerSecond: stats.tokensPerSecond }),
         ...(stats?.generatedTokens !== undefined && { generatedTokens: stats.generatedTokens }),
-        ...(stats?.promptTokens !== undefined && { promptTokens: stats.promptTokens }),
         ...(final.stopReason !== undefined && { stopReason: final.stopReason }),
         ...(stats?.backendDevice !== undefined && { backend: stats.backendDevice }),
       };

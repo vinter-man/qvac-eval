@@ -11,7 +11,7 @@ const unitInterval = z.number().min(0).max(1);
 export const modelKindSchema = z.enum(['llm', 'embedding', 'asr']);
 export type ModelKind = z.infer<typeof modelKindSchema>;
 
-export const generationSchema = z.strictObject({
+const generationSchema = z.strictObject({
   temperature: z.number().min(0).optional(),
   seed: z.int().optional(),
   maxTokens: z.int().positive().optional(),
@@ -31,10 +31,10 @@ const modelFields = {
   generation: generationSchema.optional(),
 };
 
-export const modelDefinitionSchema = z.strictObject(modelFields);
+const modelDefinitionSchema = z.strictObject(modelFields);
 export type ModelDefinition = z.infer<typeof modelDefinitionSchema>;
 
-export const inlineModelSchema = z.strictObject({ id: identifier, ...modelFields });
+const inlineModelSchema = z.strictObject({ id: identifier, ...modelFields });
 export type InlineModel = z.infer<typeof inlineModelSchema>;
 
 export const modelRegistrySchema = z.strictObject({
@@ -79,7 +79,6 @@ const rankingRule = z.strictObject({
   closer: z.tuple([z.int().min(0), z.int().min(0)]),
   than: z.tuple([z.int().min(0), z.int().min(0)]),
 });
-export type RankingRule = z.infer<typeof rankingRule>;
 
 const embedExpect = z.strictObject({
   dims: z.int().positive().optional(),
@@ -132,7 +131,7 @@ const transcribeCase = z.strictObject({
   expect: transcribeExpect.prefault({}),
 });
 
-export const caseSchema = z.discriminatedUnion('kind', [completionCase, embedCase, transcribeCase]);
+const caseSchema = z.discriminatedUnion('kind', [completionCase, embedCase, transcribeCase]);
 export type CaseDefinition = z.infer<typeof caseSchema>;
 export type CompletionCase = z.infer<typeof completionCase>;
 export type EmbedCase = z.infer<typeof embedCase>;

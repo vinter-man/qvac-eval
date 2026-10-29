@@ -1,6 +1,6 @@
 import { CaseTimeoutError, InfraError } from '../errors.js';
 
-export const CANCEL_GRACE_MS = 15_000;
+const CANCEL_GRACE_MS = 15_000;
 
 export async function withTimeout<T>(
   timeoutMs: number,
@@ -9,14 +9,6 @@ export async function withTimeout<T>(
   graceMs: number = CANCEL_GRACE_MS,
 ): Promise<T> {
   const controller = new AbortController();
-  const abortFromParent = () => {
-    controller.abort(parent.reason);
-  };
-  if (parent.aborted) abortFromParent();
-  parent.addEventListener('abort', abortFromParent, { once: true });
-  const deadline = setTimeout(() => {
-    controller.abort(new CaseTimeoutError(timeoutMs));
-  }, timeoutMs);
 
   let graceTimer: NodeJS.Timeout | undefined;
   const unresponsive = new Promise<never>((_, reject) => {
@@ -34,6 +26,15 @@ export async function withTimeout<T>(
   });
   unresponsive.catch(() => undefined);
 
+  const abortFromParent = () => {
+    controller.abort(parent.reason);
+  };
+  parent.addEventListener('abort', abortFromParent, { once: true });
+  if (parent.aborted) abortFromParent();
+  const deadline = setTimeout(() => {
+    controller.abort(new CaseTimeoutError(timeoutMs));
+  }, timeoutMs);
+
   const pending = work(controller.signal);
   pending.catch(() => undefined);
 
@@ -48,5 +49,25 @@ export async function withTimeout<T>(
     clearTimeout(deadline);
     if (graceTimer !== undefined) clearTimeout(graceTimer);
     parent.removeEventListener('abort', abortFromParent);
+  }
+}
+
+export async function withDeadline<T>(
+  work: Promise<T>,
+  deadlineMs: number,
+  what: string,
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new InfraError(`${what} did not finish within ${deadlineMs} ms`));
+    }, deadlineMs);
+  });
+  expired.catch(() => undefined);
+  work.catch(() => undefined);
+  try {
+    return await Promise.race([work, expired]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }

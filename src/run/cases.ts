@@ -28,7 +28,6 @@ import { euclideanNorm } from '../metrics/vector.js';
 import type { CaseMetrics, CaseResult } from '../report/schema.js';
 import type { ResolvedModel } from '../suites/load.js';
 import {
-  generationSchema,
   type CaseDefinition,
   type CompletionCase,
   type EmbedCase,
@@ -43,11 +42,11 @@ import type { GoldenEntry, GoldenFile } from './golden.js';
 import { withTimeout } from './timeout.js';
 
 export const MIN_TOKENS_FOR_RATE = 16;
-export const OUTPUT_LIMIT = 4000;
+const OUTPUT_LIMIT = 4000;
 
 const BUILT_IN_GENERATION: Generation = { temperature: 0, seed: 42, maxTokens: 64 };
 
-export interface RateSample {
+interface RateSample {
   tokens: number;
   tokensPerSecond: number;
 }
@@ -74,6 +73,7 @@ export interface CaseContext {
   signal: AbortSignal;
   cwd: string;
   golden?: GoldenFile;
+  recording: boolean;
 }
 
 type Sampled<T> = { samples: T[]; error?: undefined } | { samples: T[]; error: SampleError };
@@ -87,11 +87,9 @@ function clip(text: string): string {
   return text.length > OUTPUT_LIMIT ? `${text.slice(0, OUTPUT_LIMIT)}…` : text;
 }
 
-const GENERATION_KEYS = new Set(Object.keys(generationSchema.shape));
-
-function suiteGeneration(suite: SuiteDefinition): Generation {
-  const entries = Object.entries(suite.defaults ?? {}).filter(([key]) => GENERATION_KEYS.has(key));
-  return generationSchema.parse(Object.fromEntries(entries));
+function splitDefaults(suite: SuiteDefinition): { generation: Generation; timeoutMs?: number } {
+  const { timeoutMs, ...generation } = suite.defaults ?? {};
+  return { generation, ...(timeoutMs !== undefined && { timeoutMs }) };
 }
 
 function mergeGeneration(
@@ -99,18 +97,23 @@ function mergeGeneration(
   suite: SuiteDefinition,
   testCase: CompletionCase,
 ): Generation {
-  return { ...BUILT_IN_GENERATION, ...model, ...suiteGeneration(suite), ...testCase.generation };
+  return {
+    ...BUILT_IN_GENERATION,
+    ...model,
+    ...splitDefaults(suite).generation,
+    ...testCase.generation,
+  };
 }
 
 function timeoutFor(testCase: CaseDefinition, suite: SuiteDefinition, config: EvalConfig): number {
-  return testCase.timeoutMs ?? suite.defaults?.timeoutMs ?? config.timeouts.caseMs;
+  return testCase.timeoutMs ?? splitDefaults(suite).timeoutMs ?? config.timeouts.caseMs;
 }
 
 function toMessages(input: CompletionCase['input']): Message[] {
   return typeof input === 'string' ? [{ role: 'user', content: input }] : input;
 }
 
-export function audioPath(testCase: TranscribeCase, cwd: string): string {
+function audioPath(testCase: TranscribeCase, cwd: string): string {
   return resolve(cwd, testCase.input);
 }
 
@@ -192,6 +195,15 @@ function toleranceOf(
   return tolerance === true ? fallback : (tolerance[key] ?? fallback);
 }
 
+function goldenState(
+  testCase: CaseDefinition,
+  comparison: GoldenComparison | undefined,
+  context: CaseContext,
+): CaseResult['golden'] {
+  if (testCase.expect.golden === undefined || context.recording) return undefined;
+  return comparison?.similarity === undefined ? 'missing' : 'compared';
+}
+
 function settle(
   testCase: CaseDefinition,
   attempts: number,
@@ -199,6 +211,7 @@ function settle(
   golden: GoldenComparison | undefined,
   metrics: CaseMetrics,
   output: string,
+  state: CaseResult['golden'],
 ): CaseResult {
   const failed = evaluated.checks.some((check) => !check.passed);
   const regressions = golden?.regressions ?? [];
@@ -209,6 +222,7 @@ function settle(
     ...(testCase.description !== undefined && { description: testCase.description }),
     status: failed ? 'failed' : regressions.length > 0 ? 'regressed' : 'passed',
     attempts,
+    ...(state !== undefined && { golden: state }),
     checks: evaluated.checks,
     regressions,
     metrics,
@@ -273,7 +287,11 @@ async function runCompletion(testCase: CompletionCase, context: CaseContext): Pr
   );
 
   const entry = goldenEntryFor(context, testCase);
-  const minSimilarity = toleranceOf(testCase.expect.golden, 'minSimilarity', 0.85);
+  const minSimilarity = toleranceOf(
+    testCase.expect.golden,
+    'minSimilarity',
+    context.config.golden.minSimilarity,
+  );
   const comparison =
     entry !== undefined && minSimilarity !== undefined && context.golden !== undefined
       ? compareTextWithGolden(entry, first.text, minSimilarity, context.golden.sdk)
@@ -293,7 +311,15 @@ async function runCompletion(testCase: CompletionCase, context: CaseContext): Pr
     ...(testCase.expect.golden !== undefined && {
       golden: { kind: 'completion', text: first.text },
     }),
-    result: settle(testCase, attempts, evaluated, comparison, metrics, first.text),
+    result: settle(
+      testCase,
+      attempts,
+      evaluated,
+      comparison,
+      metrics,
+      first.text,
+      goldenState(testCase, comparison, context),
+    ),
   };
 }
 
@@ -320,7 +346,11 @@ async function runEmbedding(testCase: EmbedCase, context: CaseContext): Promise<
   const evaluated = checkEmbedding(testCase.expect, { vectors: first.vectors, latencyMs });
 
   const entry = goldenEntryFor(context, testCase);
-  const minCosine = toleranceOf(testCase.expect.golden, 'minCosine', 0.98);
+  const minCosine = toleranceOf(
+    testCase.expect.golden,
+    'minCosine',
+    context.config.golden.minCosine,
+  );
   const comparison =
     entry !== undefined && minCosine !== undefined && context.golden !== undefined
       ? compareVectorsWithGolden(entry, first.vectors, minCosine, context.golden.sdk)
@@ -335,7 +365,6 @@ async function runEmbedding(testCase: EmbedCase, context: CaseContext): Promise<
 
   return {
     perf,
-    ...(first.backend !== undefined && { backend: first.backend }),
     ...(testCase.expect.golden !== undefined && {
       golden: {
         kind: 'embed',
@@ -349,6 +378,7 @@ async function runEmbedding(testCase: EmbedCase, context: CaseContext): Promise<
       comparison,
       metrics,
       describeVectors(first.vectors),
+      goldenState(testCase, comparison, context),
     ),
   };
 }
@@ -382,7 +412,11 @@ async function runTranscription(
   });
 
   const entry = goldenEntryFor(context, testCase);
-  const minSimilarity = toleranceOf(testCase.expect.golden, 'minSimilarity', 0.85);
+  const minSimilarity = toleranceOf(
+    testCase.expect.golden,
+    'minSimilarity',
+    context.config.golden.minSimilarity,
+  );
   const comparison =
     entry !== undefined && minSimilarity !== undefined && context.golden !== undefined
       ? compareTextWithGolden(entry, first.text, minSimilarity, context.golden.sdk)
@@ -402,7 +436,15 @@ async function runTranscription(
     ...(testCase.expect.golden !== undefined && {
       golden: { kind: 'transcribe', text: first.text },
     }),
-    result: settle(testCase, context.repeat, evaluated, comparison, metrics, first.text),
+    result: settle(
+      testCase,
+      context.repeat,
+      evaluated,
+      comparison,
+      metrics,
+      first.text,
+      goldenState(testCase, comparison, context),
+    ),
   };
 }
 

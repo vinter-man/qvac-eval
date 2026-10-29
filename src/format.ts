@@ -1,4 +1,4 @@
-export function round(value: number, digits: number): number {
+function round(value: number, digits: number): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
 }
@@ -28,10 +28,6 @@ export function formatSignedPercent(change: number): string {
   if (!Number.isFinite(change)) return change > 0 ? '+∞%' : '-∞%';
   const rounded = round(change, 1);
   return `${rounded > 0 ? '+' : ''}${rounded}%`;
-}
-
-export function formatPercent(fraction: number, digits = 1): string {
-  return `${formatNumber(fraction * 100, digits)}%`;
 }
 
 export function quote(text: string, limit = 160): string {

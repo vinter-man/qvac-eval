@@ -1,6 +1,7 @@
 import { formatMs, formatRate } from '../../format.js';
 import type { CaseResult, CaseStatus } from '../schema.js';
 import {
+  caseNote,
   describeChange,
   formatSimilarity,
   formatUtc,
@@ -14,7 +15,7 @@ import type { FontAssets } from './assets.js';
 import { barChart, PATTERN_FILL, type BarRow, type BarSeries, type Pattern } from './chart.js';
 import { diffWords, type DiffSegment } from './diff.js';
 import { html, join, raw, type Safe } from './escape.js';
-import { renderPage } from './page.js';
+import { countBadge, renderPage } from './page.js';
 
 export interface HtmlOptions {
   fonts: FontAssets;
@@ -22,13 +23,6 @@ export interface HtmlOptions {
   generatedAt: string;
   links?: { history?: string; run?: string };
 }
-
-const STATUS_WORD: Record<CaseStatus, string> = {
-  passed: 'passed',
-  failed: 'failed',
-  regressed: 'regressed',
-  errored: 'errored',
-};
 
 export function statusMark(status: CaseStatus): Safe {
   const frame = '<rect x=".6" y=".6" width="10.8" height="10.8"';
@@ -118,7 +112,7 @@ function speedSection(view: ReportView): Safe {
         })}`;
 
   return html`<section id="speed" aria-labelledby="h-speed">
-    <h2 id="h-speed">Speed<sup>${view.perf.length}</sup></h2>
+    <h2 id="h-speed">Speed${countBadge(view.perf.length)}</h2>
     <p class="lede">Measured on ${view.platformLabel}. Load time excludes the download. Peak memory is the resident size of the whole process tree, worker included.</p>
     ${tokens}
     ${latency}
@@ -154,10 +148,10 @@ function regressionsSection(view: ReportView): Safe {
   });
   const body =
     items.length === 0
-      ? html`<p class="empty">Nothing slipped against the golden outputs or the baseline.</p>`
+      ? html`<p class="empty">${view.comparedAgainst}</p>`
       : html`<ul class="regs">${items}</ul>`;
   return html`<section id="regressions" aria-labelledby="h-regressions">
-    <h2 id="h-regressions">Regressions<sup>${items.length}</sup></h2>
+    <h2 id="h-regressions">Regressions${countBadge(items.length)}</h2>
     ${body}
   </section>`;
 }
@@ -218,7 +212,7 @@ function caseBody(row: CaseRow): Safe {
   const earlier =
     row.older === undefined
       ? null
-      : html`<p class="mut">Earlier SDK: ${STATUS_WORD[row.older.status]}${row.outputSimilarity === undefined ? '' : `, ${formatSimilarity(row.outputSimilarity)}`}</p>`;
+      : html`<p class="mut">Earlier SDK: ${row.older.status}${row.outputSimilarity === undefined ? '' : `, ${formatSimilarity(row.outputSimilarity)}`}</p>`;
   return html`<div class="case-body">
     ${result.description === undefined ? null : html`<p class="mut">${result.description}</p>`}
     ${result.error === undefined ? null : html`<p><b>${result.error.kind}</b> · ${result.error.message}</p>`}
@@ -229,14 +223,6 @@ function caseBody(row: CaseRow): Safe {
   </div>`;
 }
 
-function caseNote(row: CaseRow): string {
-  const { result } = row;
-  if (result.error !== undefined) return `${result.error.kind}: ${result.error.message}`;
-  const failed = result.checks.find((check) => !check.passed);
-  if (failed !== undefined) return failed.detail ?? failed.name;
-  return result.regressions[0]?.message ?? '';
-}
-
 function caseHtml(row: CaseRow): Safe {
   const { result, model } = row;
   const latency = result.metrics === undefined ? '' : formatMs(result.metrics.latencyMs);
@@ -245,11 +231,11 @@ function caseHtml(row: CaseRow): Safe {
   const open = result.status === 'passed' ? '' : ' open';
   return html`<details class="case" data-status="${result.status}" data-model="${model.id}"${raw(open)}>
     <summary>
-      <span class="status">${before}${statusMark(result.status)}${STATUS_WORD[result.status]}</span>
+      <span class="status">${before}${statusMark(result.status)}${result.status}</span>
       <span class="case-id">${result.id}</span>
       <span class="case-model mut">${model.id}</span>
       <span class="case-metric">${latency}</span>
-      <span class="case-note mut">${caseNote(row)}</span>
+      <span class="case-note mut">${caseNote(result)}</span>
     </summary>
     ${caseBody(row)}
   </details>`;
@@ -262,7 +248,7 @@ function filterButton(
   count: number,
   pressed: boolean,
 ): Safe {
-  return html`<button class="btn" type="button" data-kind="${kind}" data-value="${value}" aria-pressed="${String(pressed)}">${label}<sup>${count}</sup></button>`;
+  return html`<button class="btn" type="button" data-kind="${kind}" data-value="${value}" aria-pressed="${String(pressed)}">${label}${countBadge(count)}</button>`;
 }
 
 function casesSection(view: ReportView): Safe {
@@ -294,8 +280,8 @@ function casesSection(view: ReportView): Safe {
   const rows =
     view.cases.length === 0 ? html`<p class="empty">No case ran.</p>` : view.cases.map(caseHtml);
   return html`<section id="cases" aria-labelledby="h-cases">
-    <h2 id="h-cases">Cases<sup>${summary.total}</sup></h2>
-    <div class="filters group" id="filters" role="group" aria-label="Filter cases" hidden>${statusButtons}${modelButtons}</div>
+    <h2 id="h-cases">Cases${countBadge(summary.total)}</h2>
+    <div class="filters" id="filters" role="group" aria-label="Filter cases" hidden>${statusButtons}${modelButtons}</div>
     <p class="filter-note" id="filter-note" aria-live="polite"></p>
     <div class="cases">${rows}</div>
   </section>`;
@@ -323,7 +309,7 @@ function heroSection(view: ReportView): Safe {
     ['errored', summary.errored],
   ];
   const items = tally.map(
-    ([status, count]) => html`<li>${statusMark(status)}<b>${count}</b>${STATUS_WORD[status]}</li>`,
+    ([status, count]) => html`<li>${statusMark(status)}<b>${count}</b>${status}</li>`,
   );
   const bar = raw(
     `<svg class="tone" width="100%" height="10" aria-hidden="true" focusable="false"><rect width="100%" height="10" fill="${toneFill(verdict.tone)}"/><rect width="100%" height="10" fill="none" stroke="currentColor" stroke-width="2"/></svg>`,
@@ -342,9 +328,9 @@ export function renderHtml(view: ReportView, options: HtmlOptions): string {
   const body = html`${heroSection(view)}
     <div class="layout">
       <nav class="selector" aria-label="Sections">
-        <a href="#speed">Speed<sup>${view.perf.length}</sup></a>
-        <a href="#regressions">Regressions<sup>${view.regressions.length}</sup></a>
-        <a href="#cases">Cases<sup>${view.summary.total}</sup></a>
+        <a href="#speed">Speed${countBadge(view.perf.length)}</a>
+        <a href="#regressions">Regressions${countBadge(view.regressions.length)}</a>
+        <a href="#cases">Cases${countBadge(view.summary.total)}</a>
         <a href="#environment">Environment</a>
       </nav>
       <div>

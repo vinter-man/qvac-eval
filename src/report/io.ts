@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { UsageError } from '../errors.js';
+import { isNotFound, UsageError } from '../errors.js';
 import { compareVersions } from '../run/golden.js';
 import { runReportSchema, type RunReport } from './schema.js';
 import { summarize, verdictFor } from './summary.js';
@@ -11,8 +11,7 @@ export async function readReport(file: string): Promise<RunReport> {
   try {
     text = await readFile(file, 'utf8');
   } catch (error) {
-    const reason =
-      (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'file not found' : String(error);
+    const reason = isNotFound(error) ? 'file not found' : String(error);
     throw new UsageError(`Cannot read report ${file}: ${reason}`);
   }
   let parsed: unknown;
@@ -82,7 +81,7 @@ export async function loadReports(paths: readonly string[]): Promise<RunReport[]
   return Promise.all(files.map((file) => readReport(file)));
 }
 
-export function platformOf(report: RunReport): string {
+function platformOf(report: RunReport): string {
   return `${report.environment.platform}-${report.environment.arch}`;
 }
 

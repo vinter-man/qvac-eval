@@ -1,5 +1,5 @@
 import type { Device, LoadStats, RunnerSession } from '../adapter/types.js';
-import { describeError, InfraError } from '../errors.js';
+import { describeError, InfraError, UsageError } from '../errors.js';
 import { distribution, sum } from '../metrics/stats.js';
 import type { CaseResult, ModelRun, Perf, RunReport } from '../report/schema.js';
 import { summarize, verdictFor } from '../report/summary.js';
@@ -15,7 +15,9 @@ import {
 } from './cases.js';
 import { findGolden, saveGolden, type GoldenEntry, type GoldenFile } from './golden.js';
 import type { MemorySamplerFactory } from './memory.js';
-import { withTimeout } from './timeout.js';
+import { withDeadline, withTimeout } from './timeout.js';
+
+const UNLOAD_DEADLINE_MS = 30_000;
 
 export type ProgressEvent =
   | { type: 'model-start'; model: ResolvedModel; cases: number }
@@ -137,6 +139,7 @@ async function runModel(
         repeat: settings.repeat,
         signal,
         cwd: settings.cwd,
+        recording: settings.updateGolden,
         ...(golden !== undefined && { golden }),
       });
       outcomes.push(outcome);
@@ -148,7 +151,7 @@ async function runModel(
 
   let unloadNote: string | undefined;
   try {
-    await runner.unload();
+    await withDeadline(runner.unload(), UNLOAD_DEADLINE_MS, 'Unloading the model');
   } catch (error) {
     unloadNote = `unloading the model failed: ${describeError(error)}`;
   }
@@ -175,8 +178,7 @@ async function runModel(
   const savedNote = settings.updateGolden
     ? await recordGolden(model, outcomes, settings)
     : undefined;
-  const backend =
-    outcomes.find((outcome) => outcome.backend !== undefined)?.backend ?? loadStats.backend;
+  const backend = outcomes.find((outcome) => outcome.backend !== undefined)?.backend;
   const note = [unloadNote, savedNote].filter((entry) => entry !== undefined).join('; ');
   return {
     model: modelIdentity(model),
@@ -229,6 +231,12 @@ export async function runSuite(settings: RunSettings): Promise<RunReport> {
     model,
     cases: casesForModel(settings.suite.definition, model),
   }));
+  if (plan.every((entry) => entry.cases.length === 0)) {
+    throw new UsageError(
+      `None of the selected models has a case in the suite "${settings.suite.definition.suite}"`,
+      plan.map((entry) => `${entry.model.id} (${entry.model.kind})`),
+    );
+  }
   await assertFixturesExist(
     plan.flatMap((entry) => entry.cases),
     settings.cwd,

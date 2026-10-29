@@ -1,7 +1,9 @@
+import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-import { UsageError } from '../../errors.js';
+import { isNotFound, UsageError } from '../../errors.js';
 import { loadReports, mergeReports, writeReport } from '../../report/io.js';
+import { expectPlan, parsePlan } from '../../report/plan.js';
 import { compareReports, type Comparison } from '../../report/compare.js';
 import type { RunReport } from '../../report/schema.js';
 import { exitCodeFor } from '../../report/summary.js';
@@ -22,6 +24,8 @@ export interface ReportOptions {
   baseline?: string;
   config?: string;
   historyLink?: string;
+  plan?: string;
+  runner?: string;
   site?: string;
   previous?: string;
   keep: number;
@@ -128,12 +132,26 @@ async function finish(
   return exitCodeFor(final.verdict);
 }
 
+async function readPlanFile(file: string, deps: CliDeps): Promise<string> {
+  try {
+    return await readFile(resolve(deps.cwd, file), 'utf8');
+  } catch (error) {
+    throw new UsageError(
+      `Cannot read plan ${file}: ${isNotFound(error) ? 'file not found' : String(error)}`,
+    );
+  }
+}
+
 export async function reportCommand(
   inputs: readonly string[],
   options: ReportOptions,
   deps: CliDeps,
 ): Promise<number> {
-  return finish(await loadGroups(inputs, deps), options, deps);
+  const groups = await loadGroups(inputs, deps);
+  if (options.plan === undefined) return finish(groups, options, deps);
+  if (options.runner === undefined) throw new UsageError('--plan needs --runner to pick its jobs');
+  const plan = parsePlan(await readPlanFile(options.plan, deps), options.plan);
+  return finish(expectPlan(groups, plan, options.runner), options, deps);
 }
 
 export async function compareCommand(

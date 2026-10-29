@@ -3,7 +3,7 @@ import { formatUtc } from '../view.js';
 import type { FontAssets } from './assets.js';
 import { trendChart } from './chart.js';
 import { html, type Safe } from './escape.js';
-import { renderPage } from './page.js';
+import { countBadge, renderPage } from './page.js';
 import { statusMark } from './render.js';
 
 export interface HistoryOptions {
@@ -61,12 +61,12 @@ export function renderHistory(history: History, options: HistoryOptions): string
     <div class="layout">
       <nav class="selector" aria-label="Sections">
         <a href="#trends">Trends</a>
-        <a href="#runs">Runs<sup>${newest.length}</sup></a>
+        <a href="#runs">Runs${countBadge(newest.length)}</a>
       </nav>
       <div>
         <div id="trends">${trendSections(history)}</div>
         <section id="runs" aria-labelledby="h-runs">
-          <h2 id="h-runs">Runs<sup>${newest.length}</sup></h2>
+          <h2 id="h-runs">Runs${countBadge(newest.length)}</h2>
           <div class="scroll">
             <table>
               <thead>

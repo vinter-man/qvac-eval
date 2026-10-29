@@ -1,6 +1,4 @@
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-
 import { describe, expect, it } from 'vitest';
 
 import { compareTextWithGolden, compareVectorsWithGolden } from '../src/metrics/golden.js';
@@ -134,7 +132,6 @@ describe('golden files', () => {
   it('ignores directories that are not versions', async () => {
     const dir = await makeWorkspace({ 'tiny-llm/notes/smoke.json': '{}' });
     expect(await findGolden(dir, 'tiny-llm', 'smoke', '0.22.0')).toBeUndefined();
-    expect(join(dir)).toBeTruthy();
   });
 });
 

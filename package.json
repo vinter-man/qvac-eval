@@ -2,6 +2,24 @@
   "name": "qvac-eval",
   "version": "0.1.0",
   "description": "Regression tests for local AI models running on the QVAC SDK: YAML suites, golden outputs, performance numbers, and a report you can read offline.",
+  "keywords": [
+    "qvac",
+    "llm",
+    "evaluation",
+    "regression-testing",
+    "local-ai",
+    "whisper",
+    "embeddings",
+    "github-actions"
+  ],
+  "homepage": "https://github.com/vinter-man/qvac-eval#readme",
+  "bugs": {
+    "url": "https://github.com/vinter-man/qvac-eval/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vinter-man/qvac-eval.git"
+  },
   "license": "MIT",
   "author": "vinter-man",
   "type": "module",
@@ -25,7 +43,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "verify": "npm run lint && npm run typecheck && npm run format:check && npm run test:coverage"
+    "verify": "npm run lint && npm run typecheck && npm run format:check && npm run knip && npm run test:coverage",
+    "knip": "knip",
+    "prepare": "npm run build"
   },
   "peerDependencies": {
     "@qvac/sdk": ">=0.21.0 <1.0.0"
@@ -48,6 +68,7 @@
     "@vitest/coverage-v8": "5.0.5",
     "eslint": "10.13.0",
     "globals": "17.13.0",
+    "knip": "6.43.0",
     "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",

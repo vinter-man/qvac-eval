@@ -49,3 +49,7 @@ ${input.body}
 `;
   return page.value;
 }
+
+export function countBadge(count: number): Safe {
+  return html`<sup><span class="sr"> (</span>${count}<span class="sr">)</span></sup>`;
+}

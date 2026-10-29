@@ -89,7 +89,6 @@ function fakeSdk(overrides: Partial<QvacSdkModule> = {}) {
             timeToFirstToken: 12,
             tokensPerSecond: 250,
             generatedTokens: 3,
-            promptTokens: 20,
             backendDevice: 'cpu',
           },
         }),
@@ -299,7 +298,6 @@ describe('QvacRunner.complete', () => {
       ttftMs: 12,
       tokensPerSecond: 250,
       generatedTokens: 3,
-      promptTokens: 20,
       stopReason: 'eos',
       backend: 'cpu',
     });

@@ -21,6 +21,10 @@ export const CLIENT_SCRIPT = `
     });
   }
 
+  window.addEventListener('beforeprint', function () {
+    Array.prototype.forEach.call(document.querySelectorAll('details.case'), function (row) { row.open = true; });
+  });
+
   var filters = document.getElementById('filters');
   var cases = Array.prototype.slice.call(document.querySelectorAll('.case'));
   if (!filters || cases.length === 0) return;

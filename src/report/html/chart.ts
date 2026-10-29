@@ -38,13 +38,13 @@ export function patternDefs(): Safe {
   );
 }
 
-export function swatch(pattern: Pattern): Safe {
+function swatch(pattern: Pattern): Safe {
   return raw(
     `<svg class="swatch" width="14" height="10" viewBox="0 0 14 10" aria-hidden="true"><rect x=".6" y=".6" width="12.8" height="8.8" fill="${PATTERN_FILL[pattern]}" stroke="currentColor" stroke-width="1.2"/></svg>`,
   );
 }
 
-export function legend(series: readonly BarSeries[]): Safe {
+function legend(series: readonly BarSeries[]): Safe {
   const items = series.map(
     (entry) => html`<li>${swatch(entry.pattern)}<span>${entry.label}</span></li>`,
   );
@@ -84,7 +84,7 @@ export function barChart(options: {
   const ticks = [0, 0.25, 0.5, 0.75, 1].map(
     (fraction) => html`<span>${options.formatTick(ceiling * fraction)}</span>`,
   );
-  return html`<figure class="chart" role="img" aria-label="${options.ariaLabel}">
+  return html`<figure class="chart" aria-label="${options.ariaLabel}">
     ${options.series.length > 1 ? legend(options.series) : null}
     <div class="bars">
       ${options.rows.map((row) => barRow(row, options.series[row.series], ceiling))}
@@ -133,5 +133,5 @@ export function trendChart(trends: readonly Trend[], ariaLabel: string): Safe {
       <span class="bar-value">${trend.latest}${trend.change === undefined ? null : html`<small class="mut"> ${trend.change}</small>`}</span>
     </div>`,
   );
-  return html`<div class="trends" role="img" aria-label="${ariaLabel}">${rows}</div>`;
+  return html`<div class="trends" role="group" aria-label="${ariaLabel}">${rows}</div>`;
 }

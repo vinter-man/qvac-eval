@@ -1,4 +1,4 @@
-import { access, readdir, readFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -291,8 +291,8 @@ describe('baseline', () => {
       'utf8',
     );
     const target = join(second.root, 'reports');
-    await (await import('node:fs/promises')).mkdir(target, { recursive: true });
-    await (await import('node:fs/promises')).writeFile(join(target, 'earlier.json'), reports);
+    await mkdir(target, { recursive: true });
+    await writeFile(join(target, 'earlier.json'), reports);
 
     expect(await second.run('run', 'cases/demo.yaml', '--baseline', 'latest')).toBe(1);
     const output = second.stdout.join('');
@@ -416,5 +416,102 @@ describe('report and compare', () => {
     });
     expect(await harness.run('report', 'in/now.json', '--baseline', 'in/base')).toBe(1);
     expect(harness.stdout.join('')).toContain('tokens/s fell -50%');
+  });
+});
+
+describe('guards before and after the run', () => {
+  it('exits 2 when no selected model has a case, instead of reporting an empty pass', async () => {
+    const harness = await cli(good);
+    expect(await harness.run('run', 'cases/demo.yaml', '--models', 'tiny-embed')).toBe(2);
+    expect(harness.stderr.join('')).toContain('None of the selected models has a case');
+    expect(harness.session.calls).toEqual([]);
+    expect(harness.opened.length).toBe(1);
+  });
+
+  it('checks an explicit baseline before it opens the SDK', async () => {
+    const harness = await cli(good);
+    expect(await harness.run('run', 'cases/demo.yaml', '--baseline', 'nope.json')).toBe(2);
+    expect(harness.stderr.join('')).toContain('Baseline not found: nope.json');
+    expect(harness.opened).toEqual([]);
+  });
+
+  it('refuses a case that names a model that does not exist or cannot run it', async () => {
+    const typo = await cli(good, {
+      files: {
+        'cases/typo.yaml':
+          'suite: t\nmodels: [tiny-llm]\ncases:\n  - { id: a, kind: completion, input: Hi, models: [tiny-lmm] }\n',
+      },
+    });
+    expect(await typo.run('run', 'cases/typo.yaml')).toBe(2);
+    expect(typo.stderr.join('')).toContain('cases[0].models: "tiny-lmm" is not a known model');
+
+    const wrongKind = await cli(good, {
+      files: {
+        'cases/kind.yaml':
+          'suite: k\nmodels: [tiny-llm]\ncases:\n  - { id: a, kind: completion, input: Hi, models: [tiny-embed] }\n',
+      },
+    });
+    expect(await wrongKind.run('run', 'cases/kind.yaml')).toBe(2);
+    expect(wrongKind.stderr.join('')).toContain(
+      '"tiny-embed" is a embedding model and cannot run a completion case',
+    );
+  });
+});
+
+describe('report with a plan', () => {
+  const plan = JSON.stringify({
+    include: [
+      {
+        model: 'tiny-llm',
+        kind: 'llm',
+        source: 'TINY_LLM',
+        sdks: ['0.22.0'],
+        runner: 'ubuntu-24.04',
+      },
+      {
+        model: 'tiny-embed',
+        kind: 'embedding',
+        source: 'TINY_EMBED',
+        sdks: ['0.22.0'],
+        runner: 'ubuntu-24.04',
+      },
+    ],
+  });
+
+  async function withPlan() {
+    const harness = await cli(good, { files: { 'plan.json': plan } });
+    await writeReport(
+      join(harness.root, 'in', 'one.json'),
+      makeReport([makeModel('tiny-llm', [makeCase('capital')])]),
+    );
+    return harness;
+  }
+
+  it('shows a job that never reported as an infrastructure error with exit 2', async () => {
+    const harness = await withPlan();
+    expect(
+      await harness.run(
+        'report',
+        'in',
+        '--plan',
+        'plan.json',
+        '--runner',
+        'ubuntu-24.04',
+        '--html',
+        'out.html',
+      ),
+    ).toBe(2);
+    expect(harness.stdout.join('')).toContain('infrastructure error');
+    const html = await readFile(join(harness.root, 'out.html'), 'utf8');
+    expect(html).toContain('no report arrived from the job of tiny-embed on SDK 0.22.0');
+    expect(html).toContain('<h1 class="hero-word" id="verdict">Error</h1>');
+  });
+
+  it('needs a runner with the plan and a readable plan file', async () => {
+    const harness = await withPlan();
+    expect(await harness.run('report', 'in', '--plan', 'plan.json')).toBe(2);
+    expect(harness.stderr.join('')).toContain('--plan needs --runner');
+    expect(await harness.run('report', 'in', '--plan', 'missing.json', '--runner', 'x')).toBe(2);
+    expect(harness.stderr.join('')).toContain('Cannot read plan missing.json: file not found');
   });
 });

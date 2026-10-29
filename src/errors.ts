@@ -29,3 +29,7 @@ export function describeError(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
 }
+
+export function isNotFound(error: unknown): boolean {
+  return error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT';
+}

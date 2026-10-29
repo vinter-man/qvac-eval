@@ -197,9 +197,9 @@ describe('renderMarkdown', () => {
     expect(markdown).toContain(
       '| `tiny-llm` | 2 s | 100 ms | 100 tok/s | 400 ms | 600 ms | 1.17 GB |',
     );
-    expect(markdown).toContain('| `tiny-llm` | `bad` | **failed** | 50 ms | exact |');
+    expect(markdown).toContain('| `tiny-llm` | `bad` | **failed** | 50 ms | `exact` |');
     expect(markdown).toContain('<details><summary>`tiny-llm` / `bad` — failed</summary>');
-    expect(markdown).toContain('- `exact`: expected "a|b"; got "c"');
+    expect(markdown).toContain('- `exact`: expected `"a|b"`; got `"c"`');
   });
 
   it('survives output that contains code fences', () => {
@@ -227,6 +227,42 @@ describe('renderMarkdown', () => {
     expect(markdown).toContain('| `m` | 2 s | 100 ms | 100 tok/s |');
   });
 
+  it('keeps hostile model output inside code spans and fences', () => {
+    const hostile =
+      '</details>\n# pwned ![x](https://evil.example/t.png) [phish](https://evil.example/login) <img src=x onerror=alert(1)> @some-team';
+    const report = makeReport([
+      makeModel(
+        'm',
+        [
+          makeCase('bad', {
+            status: 'failed',
+            output: hostile,
+            checks: [
+              {
+                name: 'contains',
+                passed: false,
+                expected: hostile,
+                actual: hostile,
+                detail: hostile,
+              },
+            ],
+            diff: { expected: hostile, actual: hostile },
+            error: { kind: 'sdk', message: hostile },
+            regressions: [{ source: 'baseline', metric: 'wer', message: hostile }],
+          }),
+        ],
+        {},
+        { note: hostile },
+      ),
+    ]);
+    const markdown = renderMarkdown(buildView(report));
+    const outsideCode = markdown
+      .replace(/^(`{3,})[\s\S]*?^\1$/gmu, '')
+      .replace(/(`+)(?:(?!\1)[\s\S])+?\1/gu, '');
+    expect(outsideCode).not.toMatch(/evil\.example|<img|# pwned|@some-team/u);
+    expect(outsideCode.split('</details>').length - 1).toBe(1);
+  });
+
   it('shows a model that could not run instead of empty numbers', () => {
     const report = makeReport([
       makeModel(
@@ -237,7 +273,7 @@ describe('renderMarkdown', () => {
       ),
     ]);
     expect(renderMarkdown(buildView(report))).toContain(
-      '| `m` | download failed \\| 503 | | | | | |',
+      '| `m` | `download failed \\| 503` | | | | | |',
     );
   });
 });
@@ -309,7 +345,7 @@ describe('renderHtml', () => {
       /<details class="case" data-status="failed" data-model="tiny-llm" open>/u,
     );
     expect(output).toContain(
-      'data-kind="status" data-value="failed" aria-pressed="false">Failed<sup>1</sup>',
+      'data-kind="status" data-value="failed" aria-pressed="false">Failed<sup><span class="sr"> (</span>1<span class="sr">)</span></sup>',
     );
     expect(output).not.toContain('data-kind="status" data-value="errored"');
   });

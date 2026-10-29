@@ -1,24 +1,23 @@
 import { join, resolve } from 'node:path';
 
 import { writeSdkConfig } from '../../adapter/sdk-config.js';
-import type { Device } from '../../adapter/types.js';
+import type { Device, RunnerSession } from '../../adapter/types.js';
+import { describeError } from '../../errors.js';
 import { writeReport } from '../../report/io.js';
 import { buildView } from '../../report/view.js';
 import { exitCodeFor } from '../../report/summary.js';
 import { applyBaseline } from '../../run/baseline.js';
 import { collectEnvironment } from '../../run/environment.js';
 import { runSuite } from '../../run/execute.js';
-import {
-  buildModelCatalog,
-  loadModelRegistry,
-  loadSuite,
-  selectModels,
-} from '../../suites/load.js';
-import { resolveBaseline } from '../baseline.js';
+import { withDeadline } from '../../run/timeout.js';
+import { loadSuite, selectModels } from '../../suites/load.js';
+import { assertBaselineExists, resolveBaseline } from '../baseline.js';
 import { createStyle, formatBaselineRegressions, formatEvent, formatSummary } from '../console.js';
-import { displayPath, firstExisting, resolveConfig } from '../inputs.js';
+import { displayPath, firstExisting, loadModelCatalog, resolveConfig } from '../inputs.js';
 import { publish } from '../publish.js';
 import type { CliDeps } from '../deps.js';
+
+const CLOSE_DEADLINE_MS = 15_000;
 
 export interface RunOptions {
   models?: string[];
@@ -36,6 +35,14 @@ export interface RunOptions {
   verbose: boolean;
 }
 
+async function closeQuietly(session: RunnerSession, deps: CliDeps): Promise<void> {
+  try {
+    await withDeadline(session.close(), CLOSE_DEADLINE_MS, 'Closing the SDK');
+  } catch (error) {
+    deps.stderr.write(`warning: ${describeError(error)}\n`);
+  }
+}
+
 function safeName(text: string): string {
   return text.replace(/[^A-Za-z0-9._+-]+/gu, '-');
 }
@@ -51,16 +58,10 @@ export async function runCommand(
   };
 
   const suite = await loadSuite(resolve(deps.cwd, suiteArgument));
-  const registryFile =
-    options.modelsFile === undefined
-      ? await firstExisting([join(deps.cwd, 'models.yaml'), join(deps.packageRoot, 'models.yaml')])
-      : resolve(deps.cwd, options.modelsFile);
-  const registry =
-    registryFile === undefined ? { models: {} } : await loadModelRegistry(registryFile);
   const config = await resolveConfig(options.config, deps);
-
-  const catalog = buildModelCatalog(registry, suite.definition);
+  const catalog = await loadModelCatalog(suite, options.modelsFile, deps);
   const models = selectModels(options.models, suite.definition, catalog);
+  if (options.baseline !== undefined) await assertBaselineExists(options.baseline, deps.cwd);
 
   const ownConfig = await firstExisting(
     ['json', 'js', 'ts'].map((extension) => join(deps.cwd, `qvac.config.${extension}`)),
@@ -154,6 +155,6 @@ export async function runCommand(
     ]);
     return exitCodeFor(report.verdict);
   } finally {
-    await session.close();
+    await closeQuietly(session, deps);
   }
 }

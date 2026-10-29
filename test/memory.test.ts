@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createProcessTreeSampler, treeRssKb, type ProcessRow } from '../src/run/memory.js';
+import {
+  createDefaultSamplerFactory,
+  createProcessTreeSampler,
+  readProcessTable,
+  treeRssKb,
+  type ProcessRow,
+} from '../src/run/memory.js';
 
 const table: ProcessRow[] = [
   { pid: 1, ppid: 0, rssKb: 100 },
@@ -72,5 +78,22 @@ describe('createProcessTreeSampler', () => {
     });
     sampler.start();
     expect(await sampler.stop()).toBe(2);
+  });
+});
+
+describe.skipIf(process.platform === 'win32')('the real process table', () => {
+  it('lists this process with its resident size and its parent', async () => {
+    const rows = await readProcessTable();
+    const own = rows.find((row) => row.pid === process.pid);
+    expect(own?.rssKb).toBeGreaterThan(1000);
+    expect(own?.ppid).toBe(process.ppid);
+    expect(treeRssKb(rows, process.pid)).toBeGreaterThanOrEqual(own?.rssKb ?? Infinity);
+  });
+
+  it('measures this process through the default sampler', async () => {
+    const sampler = createDefaultSamplerFactory()();
+    sampler.start();
+    const peak = await sampler.stop();
+    expect(peak).toBeGreaterThan(5);
   });
 });

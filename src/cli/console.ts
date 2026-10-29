@@ -51,7 +51,7 @@ function caseFigures(result: CaseResult): string[] {
   return figures;
 }
 
-export function formatCase(result: CaseResult, style: Style): string[] {
+function formatCase(result: CaseResult, style: Style): string[] {
   const head = `  ${paint(result.status, GLYPH[result.status], style)} ${result.id.padEnd(22)} ${style.dim(caseFigures(result).join('  ·  '))}`;
   const lines = [head.trimEnd()];
   if (result.error !== undefined) {

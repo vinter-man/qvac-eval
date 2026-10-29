@@ -62,7 +62,14 @@ describe('qvac-eval matrix', () => {
       sdks: ['0.22.0'],
       runners: ['ubuntu-24.04'],
       include: [
-        { model: 'tiny-llm', kind: 'llm', cases: 1, sdks: ['0.22.0'], runner: 'ubuntu-24.04' },
+        {
+          model: 'tiny-llm',
+          kind: 'llm',
+          source: 'TINY_LLM',
+          cases: 1,
+          sdks: ['0.22.0'],
+          runner: 'ubuntu-24.04',
+        },
       ],
     });
     expect(result.stderr).toContain(

@@ -8,7 +8,7 @@ import { matrixCommand, type MatrixOptions } from './commands/matrix.js';
 import { runCommand, type RunOptions } from './commands/run.js';
 import type { CliDeps } from './deps.js';
 
-export const EXIT_INTERRUPTED = 130;
+const EXIT_INTERRUPTED = 130;
 
 function parsePositiveInt(value: string): number {
   const parsed = Number(value);
@@ -41,7 +41,7 @@ function withReportOptions(command: Command): Command {
     .option('--config <file>', 'thresholds (default: ./qvac-eval.config.yaml if present)');
 }
 
-export function buildProgram(deps: CliDeps, setExit: (code: number) => void): Command {
+function buildProgram(deps: CliDeps, setExit: (code: number) => void): Command {
   const program = new Command('qvac-eval')
     .description('Regression tests for local AI models running on the QVAC SDK')
     .version(TOOL_VERSION)
@@ -124,7 +124,12 @@ export function buildProgram(deps: CliDeps, setExit: (code: number) => void): Co
         '<reports...>',
         'report files or directories (artifacts of several jobs can be merged)',
       )
-      .option('--baseline <path|latest>', 'compare with an earlier report'),
+      .option('--baseline <path|latest>', 'compare with an earlier report')
+      .option(
+        '--plan <file>',
+        'the plan printed by "matrix": jobs without a report count as infrastructure errors',
+      )
+      .option('--runner <label>', 'which runner of the plan these reports belong to'),
   ).action(async (inputs: string[], options: ReportOptions) => {
     setExit(await reportCommand(inputs, options, deps));
   });

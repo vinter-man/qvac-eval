@@ -4,19 +4,18 @@ export interface SdkProgress {
   total: number;
 }
 
-export interface SdkCompletionStats {
+interface SdkCompletionStats {
   timeToFirstToken?: number;
   tokensPerSecond?: number;
   generatedTokens?: number;
-  promptTokens?: number;
   backendDevice?: string;
 }
 
-export interface SdkCompletionEvent {
+interface SdkCompletionEvent {
   type: string;
 }
 
-export interface SdkCompletionRun {
+interface SdkCompletionRun {
   requestId: string;
   events: AsyncIterable<SdkCompletionEvent>;
   final: Promise<{
@@ -48,7 +47,7 @@ export interface SdkCompletionOptions {
   responseFormat?: Record<string, unknown>;
 }
 
-export interface QvacSdk {
+interface QvacSdk {
   loadModel(options: SdkLoadOptions): Tracked<string>;
   unloadModel(options: {
     modelId: string;

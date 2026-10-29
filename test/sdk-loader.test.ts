@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -185,7 +185,7 @@ describe('writeSdkConfig', () => {
       file: join(root, 'a', 'qvac.config.json'),
       verbose: false,
     });
-    expect(JSON.parse(await (await import('node:fs/promises')).readFile(quiet, 'utf8'))).toEqual({
+    expect(JSON.parse(await readFile(quiet, 'utf8'))).toEqual({
       loggerLevel: 'error',
       loggerConsoleOutput: false,
     });
@@ -194,7 +194,7 @@ describe('writeSdkConfig', () => {
       verbose: true,
       modelCacheDir: '/cache/models',
     });
-    expect(JSON.parse(await (await import('node:fs/promises')).readFile(loud, 'utf8'))).toEqual({
+    expect(JSON.parse(await readFile(loud, 'utf8'))).toEqual({
       loggerLevel: 'info',
       loggerConsoleOutput: true,
       cacheDirectory: '/cache/models',

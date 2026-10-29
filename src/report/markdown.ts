@@ -1,6 +1,13 @@
 import { formatMs } from '../format.js';
-import type { CaseRow, PerfRow, ReportView, ViewCell } from './view.js';
-import { describeChange, formatSimilarity } from './view.js';
+import {
+  caseNote,
+  describeChange,
+  formatSimilarity,
+  type CaseRow,
+  type PerfRow,
+  type ReportView,
+  type ViewCell,
+} from './view.js';
 
 function escapeCell(text: string): string {
   return text.replace(/\|/gu, '\\|').replace(/\s*\n\s*/gu, ' ');
@@ -32,7 +39,7 @@ function perfTable(rows: readonly PerfRow[]): string[] {
   ];
   for (const row of rows) {
     if (row.status !== 'completed') {
-      lines.push(`| ${code(row.id)} | ${escapeCell(row.note ?? row.status)} | | | | | |`);
+      lines.push(`| ${code(row.id)} | ${escapeCell(code(row.note ?? row.status))} | | | | | |`);
       continue;
     }
     lines.push(
@@ -48,16 +55,12 @@ function statusWord(status: CaseRow['result']['status']): string {
   return status === 'passed' ? 'passed' : `**${status}**`;
 }
 
-function caseNote(row: CaseRow): string {
-  const { result } = row;
-  if (result.error !== undefined) return `${result.error.kind}: ${result.error.message}`;
-  const failed = result.checks.find((check) => !check.passed);
-  if (failed !== undefined)
-    return `${failed.name}${failed.detail === undefined ? '' : `: ${failed.detail}`}`;
-  const first = result.regressions[0];
-  if (first !== undefined) return first.message;
-  if (row.outputSimilarity !== undefined && row.outputSimilarity < 1)
+function noteCell(row: CaseRow): string {
+  const note = caseNote(row.result);
+  if (note !== '') return escapeCell(code(note));
+  if (row.outputSimilarity !== undefined && row.outputSimilarity < 1) {
     return formatSimilarity(row.outputSimilarity);
+  }
   return '';
 }
 
@@ -66,7 +69,7 @@ function casesTable(rows: readonly CaseRow[]): string[] {
   for (const row of rows) {
     const latency = row.result.metrics === undefined ? '' : formatMs(row.result.metrics.latencyMs);
     lines.push(
-      `| ${code(row.model.id)} | ${code(row.result.id)} | ${statusWord(row.result.status)} | ${latency} | ${escapeCell(caseNote(row))} |`,
+      `| ${code(row.model.id)} | ${code(row.result.id)} | ${statusWord(row.result.status)} | ${latency} | ${noteCell(row)} |`,
     );
   }
   return lines;
@@ -84,15 +87,17 @@ function problemDetails(rows: readonly CaseRow[]): string[] {
     );
     for (const check of result.checks.filter((entry) => !entry.passed)) {
       const parts = [
-        check.expected === undefined ? undefined : `expected ${check.expected}`,
-        check.actual === undefined ? undefined : `got ${check.actual}`,
-        check.detail,
+        check.expected === undefined ? undefined : `expected ${code(check.expected)}`,
+        check.actual === undefined ? undefined : `got ${code(check.actual)}`,
+        check.detail === undefined ? undefined : code(check.detail),
       ].filter((part) => part !== undefined);
       lines.push(`- ${code(check.name)}: ${parts.join('; ')}`);
     }
-    for (const regression of result.regressions)
-      lines.push(`- ${code(regression.metric)}: ${regression.message}`);
-    if (result.error !== undefined) lines.push(`- ${result.error.kind}: ${result.error.message}`);
+    for (const regression of result.regressions) {
+      lines.push(`- ${code(regression.metric)}: ${code(regression.message)}`);
+    }
+    if (result.error !== undefined)
+      lines.push(`- ${result.error.kind}: ${code(result.error.message)}`);
     if (result.diff !== undefined) {
       lines.push(
         '',
@@ -128,15 +133,14 @@ export function renderMarkdown(view: ReportView): string {
     ...perfTable(view.perf),
   ];
 
-  if (view.regressions.length > 0) {
-    lines.push('', '### Regressions', '');
-    for (const regression of view.regressions) {
-      const place =
-        regression.caseId === undefined
-          ? code(regression.model)
-          : `${code(regression.model)} / ${code(regression.caseId)}`;
-      lines.push(`- ${place} · ${code(regression.metric)}: ${regression.message}`);
-    }
+  lines.push('', '### Regressions', '');
+  if (view.regressions.length === 0) lines.push(view.comparedAgainst);
+  for (const regression of view.regressions) {
+    const place =
+      regression.caseId === undefined
+        ? code(regression.model)
+        : `${code(regression.model)} / ${code(regression.caseId)}`;
+    lines.push(`- ${place} · ${code(regression.metric)}: ${code(regression.message)}`);
   }
 
   lines.push('', '### Cases', '', ...casesTable(view.cases), ...problemDetails(view.cases));

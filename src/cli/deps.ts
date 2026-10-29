@@ -8,7 +8,7 @@ import {
 import { PACKAGE_ROOT } from '../paths.js';
 import { createDefaultSamplerFactory, type MemorySamplerFactory } from '../run/memory.js';
 
-export interface Output {
+interface Output {
   write(text: string): unknown;
   isTTY?: boolean;
 }

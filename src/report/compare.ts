@@ -10,7 +10,7 @@ export interface Delta {
   changePct?: number;
 }
 
-export type CaseTransition = 'same' | 'fixed' | 'broken' | 'new' | 'removed';
+type CaseTransition = 'same' | 'fixed' | 'broken' | 'new' | 'removed';
 
 export interface CaseComparison {
   model: string;

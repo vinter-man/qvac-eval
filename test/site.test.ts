@@ -1,4 +1,4 @@
-import { access, readdir, readFile } from 'node:fs/promises';
+import { access, readdir, readFile, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -236,6 +236,20 @@ describe('report --site', () => {
     expect(await run('report', 'in/one.json', '--site', 'site', '--previous', broken)).toBe(0);
     expect(stderr.join('')).toContain('is unreadable; starting the history afresh');
     expect(await readdir(join(cwd, 'site', 'runs'))).toHaveLength(1);
+  });
+
+  it('drops a run from the history when its page could not be carried forward', async () => {
+    const { cwd, save, run, stderr } = await harness();
+    await save('one.json', at('2026-10-01T00:00:00.000Z'));
+    await save('two.json', at('2026-10-02T00:00:00.000Z'));
+    await run('report', 'in/one.json', '--site', 'site1');
+    await unlink(join(cwd, 'site1', 'runs', '20261001T000000Z-smoke-0.22.0.html'));
+    expect(await run('report', 'in/two.json', '--site', 'site2', '--previous', 'site1')).toBe(0);
+    expect(stderr.join('')).toContain('the page of 20261001T000000Z-smoke-0.22.0 is missing');
+    const history = JSON.parse(await readFile(join(cwd, 'site2', 'history.json'), 'utf8')) as {
+      entries: { id: string }[];
+    };
+    expect(history.entries.map((entry) => entry.id)).toEqual(['20261002T000000Z-smoke-0.22.0']);
   });
 
   it('works when there is no previous site at all', async () => {

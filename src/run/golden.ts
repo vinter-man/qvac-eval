@@ -1,9 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { z } from 'zod';
 
-import { UsageError } from '../errors.js';
+import { isNotFound, UsageError } from '../errors.js';
 
 const goldenEntrySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('completion'), text: z.string() }),
@@ -12,7 +13,7 @@ const goldenEntrySchema = z.discriminatedUnion('kind', [
 ]);
 export type GoldenEntry = z.infer<typeof goldenEntrySchema>;
 
-export const goldenFileSchema = z.strictObject({
+const goldenFileSchema = z.strictObject({
   schemaVersion: z.literal(1),
   suite: z.string(),
   model: z.string(),
@@ -40,11 +41,25 @@ export function compareVersions(left: string, right: string): number {
   return leftPre.localeCompare(rightPre);
 }
 
-const NUMBER_ARRAY = /\[\s*(-?\d[^[\]{}"]*?)\s*\]/gu;
-
 export function formatGolden(file: GoldenFile): string {
-  const pretty = JSON.stringify(file, null, 2);
-  return `${pretty.replace(NUMBER_ARRAY, (_match, numbers: string) => `[${numbers.replace(/\s*\n\s*/gu, ' ')}]`)}\n`;
+  const marker = randomUUID();
+  const vectors: string[] = [];
+  const pretty = JSON.stringify(
+    file,
+    (key, value: unknown) => {
+      if (key !== 'vectors' || !Array.isArray(value)) return value;
+      return value.map((vector: unknown) => {
+        vectors.push(JSON.stringify(vector).replaceAll(',', ', '));
+        return `${marker}${vectors.length - 1}`;
+      });
+    },
+    2,
+  );
+  const restored = pretty.replace(
+    new RegExp(`"${marker}(\\d+)"`, 'gu'),
+    (_match, index: string) => vectors[Number(index)] ?? '[]',
+  );
+  return `${restored}\n`;
 }
 
 export function goldenFilePath(dir: string, modelId: string, sdk: string, suite: string): string {
@@ -56,7 +71,7 @@ async function recordedVersions(dir: string, modelId: string, suite: string): Pr
   try {
     entries = await readdir(join(dir, modelId));
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    if (isNotFound(error)) return [];
     throw error;
   }
   const versions: string[] = [];
@@ -66,7 +81,7 @@ async function recordedVersions(dir: string, modelId: string, suite: string): Pr
       await access(goldenFilePath(dir, modelId, entry, suite));
       versions.push(entry);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      if (!isNotFound(error)) throw error;
     }
   }
   return versions.sort(compareVersions);
@@ -86,7 +101,7 @@ async function readGolden(file: string): Promise<GoldenFile | undefined> {
   try {
     text = await readFile(file, 'utf8');
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    if (isNotFound(error)) return undefined;
     throw new UsageError(`Cannot read golden file ${file}`, [String(error)]);
   }
   let parsed: unknown;

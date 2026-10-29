@@ -28,10 +28,20 @@ export interface TranscribeObservation {
   realTimeFactor?: number;
 }
 
-export const NORM_TOLERANCE = 0.01;
+const NORM_TOLERANCE = 0.01;
 
 function check(name: string, passed: boolean, extra: Partial<CheckResult> = {}): CheckResult {
   return { name, passed, ...extra };
+}
+
+function latencyBudget(limit: number | undefined, actual: number): CheckResult[] {
+  if (limit === undefined) return [];
+  return [
+    check('maxLatencyMs', actual <= limit, {
+      expected: `<= ${formatMs(limit)}`,
+      actual: formatMs(actual),
+    }),
+  ];
 }
 
 function foldCase(text: string, caseSensitive: boolean): string {
@@ -129,14 +139,7 @@ export function checkCompletion(
     );
   }
 
-  if (expect.maxLatencyMs !== undefined) {
-    checks.push(
-      check('maxLatencyMs', observation.latencyMs <= expect.maxLatencyMs, {
-        expected: `<= ${formatMs(expect.maxLatencyMs)}`,
-        actual: formatMs(observation.latencyMs),
-      }),
-    );
-  }
+  checks.push(...latencyBudget(expect.maxLatencyMs, observation.latencyMs));
 
   if (expect.maxTtftMs !== undefined) {
     const actual = observation.ttftMs;
@@ -230,14 +233,7 @@ export function checkEmbedding(expect: EmbedExpect, observation: EmbedObservatio
     );
   }
 
-  if (expect.maxLatencyMs !== undefined) {
-    checks.push(
-      check('maxLatencyMs', observation.latencyMs <= expect.maxLatencyMs, {
-        expected: `<= ${formatMs(expect.maxLatencyMs)}`,
-        actual: formatMs(observation.latencyMs),
-      }),
-    );
-  }
+  checks.push(...latencyBudget(expect.maxLatencyMs, observation.latencyMs));
 
   return { checks };
 }
@@ -274,14 +270,7 @@ export function checkTranscription(
     );
   }
 
-  if (expect.maxLatencyMs !== undefined) {
-    checks.push(
-      check('maxLatencyMs', observation.latencyMs <= expect.maxLatencyMs, {
-        expected: `<= ${formatMs(expect.maxLatencyMs)}`,
-        actual: formatMs(observation.latencyMs),
-      }),
-    );
-  }
+  checks.push(...latencyBudget(expect.maxLatencyMs, observation.latencyMs));
 
   if (expect.maxRealTimeFactor !== undefined) {
     const actual = observation.realTimeFactor;

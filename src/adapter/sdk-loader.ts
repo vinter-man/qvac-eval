@@ -14,7 +14,7 @@ import type { Device, RunnerSession } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
-export const SDK_PACKAGE = '@qvac/sdk';
+const SDK_PACKAGE = '@qvac/sdk';
 
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 

@@ -1,4 +1,4 @@
-export type DiffKind = 'same' | 'removed' | 'added';
+type DiffKind = 'same' | 'removed' | 'added';
 
 export interface DiffSegment {
   kind: DiffKind;

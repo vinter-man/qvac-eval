@@ -6,7 +6,6 @@ export type Device = 'cpu' | 'gpu' | 'auto';
 export interface LoadStats {
   loadMs: number;
   downloadMs?: number;
-  backend?: string;
 }
 
 export interface CompletionRequest {
@@ -21,7 +20,6 @@ export interface CompletionOutput {
   ttftMs?: number;
   tokensPerSecond?: number;
   generatedTokens?: number;
-  promptTokens?: number;
   stopReason?: string;
   backend?: string;
 }
@@ -29,8 +27,6 @@ export interface CompletionOutput {
 export interface EmbedOutput {
   vectors: number[][];
   wallMs: number;
-  totalTokens?: number;
-  backend?: string;
 }
 
 export interface TranscribeOutput {

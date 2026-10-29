@@ -31,7 +31,7 @@ export interface PerfRow {
   rss: ViewCell;
 }
 
-export interface RegressionRow {
+interface RegressionRow {
   model: string;
   caseId?: string;
   metric: string;
@@ -46,7 +46,7 @@ export interface CaseRow {
   outputSimilarity?: number;
 }
 
-export interface Fact {
+interface Fact {
   label: string;
   value: string;
 }
@@ -59,6 +59,7 @@ export interface ChartPoint {
 
 export interface ReportView {
   suite: string;
+  comparedAgainst: string;
   verdict: { word: string; tone: Verdict; sentence: string };
   sdkLabel: string;
   platformLabel: string;
@@ -76,6 +77,36 @@ export interface ReportView {
 }
 
 const WORSE_BY_AT_LEAST_PCT = 5;
+
+export function caseNote(result: CaseResult): string {
+  if (result.error !== undefined) return `${result.error.kind}: ${result.error.message}`;
+  const failed = result.checks.find((check) => !check.passed);
+  if (failed !== undefined) return failed.detail ?? failed.name;
+  return result.regressions[0]?.message ?? '';
+}
+
+function comparedAgainstOf(newer: RunReport, olderSdk: string | undefined): string {
+  const cases = newer.models.flatMap((run) => run.cases);
+  const compared = cases.filter((testCase) => testCase.golden === 'compared').length;
+  const missing = cases.filter((testCase) => testCase.golden === 'missing').length;
+  const basis = [
+    ...(compared > 0 ? ['the golden outputs'] : []),
+    ...(olderSdk === undefined
+      ? newer.baseline === undefined
+        ? []
+        : [`the baseline from SDK ${newer.baseline.sdkVersion}`]
+      : [`SDK ${olderSdk}`]),
+  ];
+  const lead =
+    basis.length === 0
+      ? 'Nothing was compared: there is no golden output and no baseline, so only the expectations of the cases were checked.'
+      : `Nothing slipped against ${basis.join(' and ')}.`;
+  const gap =
+    missing === 0
+      ? ''
+      : ` ${missing} ${missing === 1 ? 'case asks' : 'cases ask'} for a golden output that is not recorded.`;
+  return `${lead}${gap}`;
+}
 
 export function formatUtc(iso: string): string {
   return `${iso.slice(0, 16).replace('T', ' ')} UTC`;
@@ -167,7 +198,7 @@ function verdictOf(report: RunReport): ReportView['verdict'] {
   return { word, tone: 'fail', sentence: `${base}; ${parts.join(', ')}.` };
 }
 
-function platformOf(report: RunReport): string {
+function runnerLabel(report: RunReport): string {
   const { environment } = report;
   const runner = environment.ci?.runner;
   return runner ?? `${environment.platform} ${environment.arch}`;
@@ -297,9 +328,10 @@ export function buildView(report: RunReport, comparison?: Comparison): ReportVie
 
   return {
     suite: newer.suite.name,
+    comparedAgainst: comparedAgainstOf(newer, olderSdk),
     verdict: verdictOf(newer),
     sdkLabel: olderSdk === undefined ? `SDK ${newerSdk}` : `SDK ${olderSdk} → ${newerSdk}`,
-    platformLabel: platformOf(newer),
+    platformLabel: runnerLabel(newer),
     compared: older !== undefined,
     ...(olderSdk !== undefined && { olderSdk }),
     newerSdk,

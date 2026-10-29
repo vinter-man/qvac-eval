@@ -1,9 +1,16 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+const created: string[] = [];
+
+export async function removeWorkspaces(): Promise<void> {
+  await Promise.all(created.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+}
+
 export async function makeWorkspace(files: Record<string, string>): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'qvac-eval-'));
+  created.push(root);
   for (const [path, content] of Object.entries(files)) {
     const target = join(root, path);
     await mkdir(dirname(target), { recursive: true });
