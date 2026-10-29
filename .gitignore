@@ -4,7 +4,6 @@
 /reports
 /site
 /.qvac-eval
-/.playwright-mcp
 /docs/remotion/node_modules
 /docs/remotion/out
 *.tsbuildinfo
