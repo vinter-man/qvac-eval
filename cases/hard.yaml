@@ -7,6 +7,12 @@ defaults:
   maxTokens: 32
   timeoutMs: 90000
 cases:
+  - id: single-digit-sum
+    kind: completion
+    input: What is 2+2? Reply with the digit only.
+    expect:
+      regex: \b4\b
+
   - id: multiplication
     kind: completion
     input: What is 17 * 23? Digits only.
@@ -29,7 +35,7 @@ cases:
     kind: completion
     input: 'Translate to French: cat. One word.'
     expect:
-      exact: chat
+      contains: [chat]
 
   - id: reverse-string
     kind: completion

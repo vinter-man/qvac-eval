@@ -1,5 +1,5 @@
 import { access, readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -8,6 +8,8 @@ import type { RunnerSession } from '../src/adapter/types.js';
 import type { CliDeps } from '../src/cli/deps.js';
 import { main } from '../src/cli/main.js';
 import { UsageError } from '../src/errors.js';
+import { writeReport } from '../src/report/io.js';
+import type { RunReport } from '../src/report/schema.js';
 import {
   completion,
   createFakeSession,
@@ -16,7 +18,10 @@ import {
   type FakeBehavior,
   type FakeSession,
 } from './support/fakes.js';
+import { makeCase, makeModel, makeReport } from './support/reports.js';
 import { makeWorkspace, MODELS_YAML, SUITE_YAML } from './support/workspace.js';
+
+const repositoryRoot = resolve(import.meta.dirname, '..');
 
 interface Cli {
   root: string;
@@ -55,7 +60,7 @@ async function cli(
     stdout: { write: (text) => stdout.push(text) },
     stderr: { write: (text) => stderr.push(text) },
     now: () => new Date('2026-10-29T12:00:00.000Z'),
-    packageRoot: root,
+    packageRoot: repositoryRoot,
     signal: controller.signal,
     createSampler: noMemory,
     openSession: (sessionOptions): Promise<RunnerSession> => {
@@ -81,9 +86,9 @@ describe('exit codes', () => {
     const harness = await cli(good);
     expect(await harness.run('run', 'cases/demo.yaml')).toBe(0);
     const files = await readdir(join(harness.root, 'reports'));
-    expect(files).toEqual(['demo.0.22.0.tiny-llm.json']);
+    expect(files).toEqual(['demo.0.22.0.tiny-llm.html', 'demo.0.22.0.tiny-llm.json']);
     const report = JSON.parse(
-      await readFile(join(harness.root, 'reports', files[0] ?? ''), 'utf8'),
+      await readFile(join(harness.root, 'reports', 'demo.0.22.0.tiny-llm.json'), 'utf8'),
     ) as { verdict: string };
     expect(report.verdict).toBe('pass');
     const output = harness.stdout.join('');
@@ -118,7 +123,10 @@ describe('exit codes', () => {
     });
     expect(await harness.run('run', 'cases/demo.yaml')).toBe(2);
     expect(harness.stdout.join('')).toContain('model failed to load: download failed');
-    expect(await readdir(join(harness.root, 'reports'))).toHaveLength(1);
+    expect(await readdir(join(harness.root, 'reports'))).toEqual([
+      'demo.0.22.0.tiny-llm.html',
+      'demo.0.22.0.tiny-llm.json',
+    ]);
     expect(harness.session.closed).toBe(true);
   });
 
@@ -296,5 +304,110 @@ describe('baseline', () => {
       2,
     );
     expect(harness.stderr.join('')).toContain('Baseline not found: nowhere/baseline.json');
+  });
+});
+
+describe('run outputs', () => {
+  it('writes an HTML report next to the JSON and appends the Markdown summary without truncating', async () => {
+    const harness = await cli(good, { files: { 'summary.md': '# Existing job summary\n' } });
+    expect(await harness.run('run', 'cases/demo.yaml', '--summary', 'summary.md')).toBe(0);
+    const html = await readFile(join(harness.root, 'reports', 'demo.0.22.0.tiny-llm.html'), 'utf8');
+    expect(html).toContain('<title>qvac-eval · demo · Passed · SDK 0.22.0</title>');
+    const summary = await readFile(join(harness.root, 'summary.md'), 'utf8');
+    expect(summary.startsWith('# Existing job summary\n')).toBe(true);
+    expect(summary).toContain('## qvac-eval · demo — Passed');
+    expect(harness.stdout.join('')).toContain('demo.0.22.0.tiny-llm.html');
+  });
+});
+
+describe('report and compare', () => {
+  async function withReports(files: Record<string, RunReport>) {
+    const harness = await cli(good);
+    for (const [name, report] of Object.entries(files)) {
+      await writeReport(join(harness.root, 'in', name), report);
+    }
+    return harness;
+  }
+
+  const model = (id: string, rate = 100, status: 'passed' | 'failed' = 'passed') =>
+    makeModel(id, [makeCase('capital', { status })], { tokensPerSecond: rate });
+
+  it('merges the jobs of one matrix into one report and writes HTML and Markdown', async () => {
+    const harness = await withReports({
+      'a.json': makeReport([model('tiny-llm')]),
+      'b.json': makeReport([model('tiny-embed')]),
+    });
+    expect(
+      await harness.run('report', 'in', '--html', 'out/report.html', '--md', 'out/report.md'),
+    ).toBe(0);
+    const html = await readFile(join(harness.root, 'out', 'report.html'), 'utf8');
+    expect(html).toContain('tiny-llm');
+    expect(html).toContain('tiny-embed');
+    expect(await readFile(join(harness.root, 'out', 'report.md'), 'utf8')).toContain('### Speed');
+    expect(harness.stdout.join('')).toContain('Result  2 passed');
+  });
+
+  it('compares two SDK versions found in one directory and fails on a slowdown', async () => {
+    const harness = await withReports({
+      'old.json': makeReport([model('tiny-llm', 100)], {
+        sdk: '0.21.1',
+        startedAt: '2026-10-20T00:00:00.000Z',
+      }),
+      'new.json': makeReport([model('tiny-llm', 60)], { sdk: '0.22.0' }),
+    });
+    expect(await harness.run('report', 'in', '--html', 'out.html', '--merged-dir', 'merged')).toBe(
+      1,
+    );
+    const output = harness.stdout.join('');
+    expect(output).toContain('SDK 0.21.1 → 0.22.0');
+    expect(output).toContain('▲ tiny-llm  tokensPerSecond: tokens/s fell -40%');
+    expect(await readdir(join(harness.root, 'merged'))).toEqual([
+      'smoke.0.21.1.merged.json',
+      'smoke.0.22.0.merged.json',
+    ]);
+    expect(await readFile(join(harness.root, 'out.html'), 'utf8')).toContain('SDK 0.21.1 → 0.22.0');
+  });
+
+  it('compare takes the older report first and exits 0 when nothing got worse', async () => {
+    const harness = await withReports({
+      'old.json': makeReport([model('tiny-llm', 100)], { sdk: '0.21.1' }),
+      'new.json': makeReport([model('tiny-llm', 130)], { sdk: '0.22.0' }),
+    });
+    expect(await harness.run('compare', 'in/old.json', 'in/new.json', '--md', 'diff.md')).toBe(0);
+    expect(await readFile(join(harness.root, 'diff.md'), 'utf8')).toContain(
+      '(was 100 tok/s, +30%)',
+    );
+    expect(await harness.run('compare', 'in/new.json', 'in/old.json')).toBe(1);
+  });
+
+  it('rejects inputs that cannot be shown together', async () => {
+    const harness = await withReports({
+      'a.json': makeReport([model('tiny-llm')], { sdk: '0.20.1' }),
+      'b.json': makeReport([model('tiny-llm')], { sdk: '0.21.1' }),
+      'c.json': makeReport([model('tiny-llm')], { sdk: '0.22.0' }),
+      'd.json': makeReport([model('other')], { sdk: '0.22.0', platform: 'darwin' }),
+    });
+    expect(await harness.run('report', 'in/a.json', 'in/b.json', 'in/c.json')).toBe(2);
+    expect(harness.stderr.join('')).toContain('more than two SDK versions');
+    expect(await harness.run('report', 'in/c.json', 'in/d.json')).toBe(2);
+    expect(harness.stderr.join('')).toContain('different platforms');
+    expect(await harness.run('report', 'in/a.json', 'in/b.json', '--baseline', 'in/c.json')).toBe(
+      2,
+    );
+    expect(harness.stderr.join('')).toContain('--baseline cannot be combined');
+    expect(await harness.run('report', 'in/missing.json')).toBe(2);
+    expect(await harness.run('compare', 'in/a.json', 'in')).toBe(2);
+  });
+
+  it('applies a baseline to a single report', async () => {
+    const harness = await withReports({
+      'now.json': makeReport([model('tiny-llm', 50)], { sdk: '0.22.0' }),
+      'base/before.json': makeReport([model('tiny-llm', 100)], {
+        sdk: '0.22.0',
+        startedAt: '2026-10-01T00:00:00.000Z',
+      }),
+    });
+    expect(await harness.run('report', 'in/now.json', '--baseline', 'in/base')).toBe(1);
+    expect(harness.stdout.join('')).toContain('tokens/s fell -50%');
   });
 });

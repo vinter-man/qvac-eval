@@ -3,6 +3,7 @@ import { Command, CommanderError, InvalidArgumentError, Option } from 'commander
 import { describeError, InfraError, UsageError } from '../errors.js';
 import { InterruptedError } from '../run/execute.js';
 import { TOOL_VERSION } from '../version.js';
+import { compareCommand, reportCommand, type ReportOptions } from './commands/report.js';
 import { runCommand, type RunOptions } from './commands/run.js';
 import type { CliDeps } from './deps.js';
 
@@ -21,6 +22,16 @@ function parseList(value: string): string[] {
     .split(',')
     .map((item) => item.trim())
     .filter((item) => item !== '');
+}
+
+function withReportOptions(command: Command): Command {
+  return command
+    .option('--html <file>', 'write a self-contained HTML report')
+    .option('--md <file>', 'write a Markdown report')
+    .option('--summary <file>', 'append a Markdown summary to this file (for $GITHUB_STEP_SUMMARY)')
+    .option('--merged-dir <dir>', 'write the merged JSON report of every SDK version here')
+    .option('--history-link <href>', 'link the report back to a history page')
+    .option('--config <file>', 'thresholds (default: ./qvac-eval.config.yaml if present)');
 }
 
 export function buildProgram(deps: CliDeps, setExit: (code: number) => void): Command {
@@ -68,10 +79,34 @@ export function buildProgram(deps: CliDeps, setExit: (code: number) => void): Co
       'model registry (default: ./models.yaml, then the built-in one)',
     )
     .option('--cache-dir <dir>', 'where the SDK keeps downloaded model weights')
+    .option('--summary <file>', 'append a Markdown summary to this file (for $GITHUB_STEP_SUMMARY)')
     .option('--verbose', 'show the SDK logs', false)
     .action(async (suite: string, options: RunOptions) => {
       setExit(await runCommand(suite, options, deps));
     });
+
+  withReportOptions(
+    program
+      .command('report')
+      .description('Merge reports and render them as an HTML page and Markdown')
+      .argument(
+        '<reports...>',
+        'report files or directories (artifacts of several jobs can be merged)',
+      )
+      .option('--baseline <path|latest>', 'compare with an earlier report'),
+  ).action(async (inputs: string[], options: ReportOptions) => {
+    setExit(await reportCommand(inputs, options, deps));
+  });
+
+  withReportOptions(
+    program
+      .command('compare')
+      .description('Compare two runs, typically two SDK versions on the same cases')
+      .argument('<older>', 'the baseline report (file or directory)')
+      .argument('<newer>', 'the report under test (file or directory)'),
+  ).action(async (older: string, newer: string, options: ReportOptions) => {
+    setExit(await compareCommand(older, newer, options, deps));
+  });
 
   return program;
 }

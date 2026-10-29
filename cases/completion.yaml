@@ -14,11 +14,11 @@ cases:
       contains: [Paris]
       golden: true
 
-  - id: arithmetic
+  - id: antonym
     kind: completion
-    input: What is 2+2? Reply with the digit only.
+    input: What is the opposite of hot? One word.
     expect:
-      regex: \b4\b
+      contains: [cold]
 
   - id: round-earth
     kind: completion

@@ -1,22 +1,23 @@
-import { access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 import { writeSdkConfig } from '../../adapter/sdk-config.js';
 import type { Device } from '../../adapter/types.js';
 import { writeReport } from '../../report/io.js';
+import { buildView } from '../../report/view.js';
 import { exitCodeFor } from '../../report/summary.js';
 import { applyBaseline } from '../../run/baseline.js';
 import { collectEnvironment } from '../../run/environment.js';
 import { runSuite } from '../../run/execute.js';
 import {
   buildModelCatalog,
-  loadConfig,
   loadModelRegistry,
   loadSuite,
   selectModels,
 } from '../../suites/load.js';
 import { resolveBaseline } from '../baseline.js';
 import { createStyle, formatBaselineRegressions, formatEvent, formatSummary } from '../console.js';
+import { firstExisting, resolveConfig } from '../inputs.js';
+import { publish } from '../publish.js';
 import type { CliDeps } from '../deps.js';
 
 export interface RunOptions {
@@ -31,19 +32,8 @@ export interface RunOptions {
   config?: string;
   modelsFile?: string;
   cacheDir?: string;
+  summary?: string;
   verbose: boolean;
-}
-
-async function firstExisting(candidates: readonly string[]): Promise<string | undefined> {
-  for (const candidate of candidates) {
-    try {
-      await access(candidate);
-      return candidate;
-    } catch {
-      continue;
-    }
-  }
-  return undefined;
 }
 
 function safeName(text: string): string {
@@ -67,11 +57,7 @@ export async function runCommand(
       : resolve(deps.cwd, options.modelsFile);
   const registry =
     registryFile === undefined ? { models: {} } : await loadModelRegistry(registryFile);
-  const configFile =
-    options.config === undefined
-      ? await firstExisting([join(deps.cwd, 'qvac-eval.config.yaml')])
-      : resolve(deps.cwd, options.config);
-  const config = await loadConfig(configFile);
+  const config = await resolveConfig(options.config, deps);
 
   const catalog = buildModelCatalog(registry, suite.definition);
   const models = selectModels(options.models, suite.definition, catalog);
@@ -147,9 +133,22 @@ export async function runCommand(
     );
     const jsonFile = join(outDir, `${name}.json`);
     await writeReport(jsonFile, report);
+    const links =
+      report.environment.ci?.runUrl === undefined ? {} : { run: report.environment.ci.runUrl };
+    const written = await publish(
+      buildView(report),
+      { html: join(outDir, `${name}.html`), summary: options.summary },
+      deps,
+      links,
+    );
 
     print(formatSummary(report, style));
-    print(['', style.dim(`Report: ${jsonFile}`)]);
+    print([
+      '',
+      ...[jsonFile, ...written.filter((file) => file !== options.summary)].map((file) =>
+        style.dim(`Wrote ${file}`),
+      ),
+    ]);
     return exitCodeFor(report.verdict);
   } finally {
     await session.close();
