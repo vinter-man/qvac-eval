@@ -453,7 +453,7 @@ describe('guards before and after the run', () => {
     });
     expect(await wrongKind.run('run', 'cases/kind.yaml')).toBe(2);
     expect(wrongKind.stderr.join('')).toContain(
-      '"tiny-embed" is an embedding model and cannot run a completion case',
+      '"tiny-embed" (embedding) cannot run the completion case "a"',
     );
   });
 });
@@ -542,6 +542,16 @@ describe('report with a plan', () => {
     const markdown = await readFile(join(harness.root, 'out.md'), 'utf8');
     expect(markdown).toContain('## qvac-eval · smoke — Error');
     expect(markdown).toContain('SDK 0.21.1 → 0.22.0');
+  });
+
+  it('says plainly that no job reported at all', async () => {
+    const harness = await cli(good, { files: { 'plan.json': plan } });
+    expect(
+      await harness.run('report', 'in', '--plan', 'plan.json', '--runner', 'ubuntu-24.04'),
+    ).toBe(2);
+    const message = harness.stderr.join('');
+    expect(message).toContain('No report arrived from any of the 2 planned jobs of ubuntu-24.04');
+    expect(message).toContain('tiny-embed on SDK 0.22.0');
   });
 
   it('refuses a runner that the plan has no job for', async () => {

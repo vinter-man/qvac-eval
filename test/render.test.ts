@@ -283,6 +283,28 @@ describe('renderMarkdown', () => {
     expect(markdown).toContain('`` `edge </details> # pwned ![x](https://evil.example/t.png)` ``');
   });
 
+  it('writes a visible placeholder for an empty message instead of empty backticks', () => {
+    const report = makeReport([
+      makeModel('m', [makeCase('bad', { status: 'errored', error: { kind: 'sdk', message: '' } })]),
+    ]);
+    expect(renderMarkdown(buildView(report))).toContain('- sdk: (empty)');
+  });
+
+  it('names the incomplete side when the older report is what makes a comparison an error', () => {
+    const older = makeReport(
+      [makeModel('m', [], {}, { status: 'infra-error', note: 'download failed' })],
+      { sdk: '0.21.1' },
+    );
+    const newer = makeReport([makeModel('m', [makeCase('a')])], { sdk: '0.22.0' });
+    const view = buildView(newer, compareReports(older, newer, limits));
+    expect(view.verdict).toEqual({
+      word: 'Error',
+      tone: 'error',
+      sentence:
+        '1 of 1 cases passed on 1 model. The report of SDK 0.21.1 is incomplete (m), so the comparison is too.',
+    });
+  });
+
   it('shows a model that could not run instead of empty numbers', () => {
     const report = makeReport([
       makeModel(

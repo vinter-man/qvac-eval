@@ -248,10 +248,6 @@ export function casesForModel(suite: SuiteDefinition, model: ResolvedModel): Cas
   );
 }
 
-function article(word: string): string {
-  return /^[aeiou]/u.test(word) ? 'an' : 'a';
-}
-
 export function modelsWithCases(
   suite: SuiteDefinition,
   models: readonly ResolvedModel[],
@@ -285,7 +281,7 @@ export function assertCaseModelsKnown(
       if (model === undefined) return [`${at}: "${id}" is not a known model`];
       if (caseKindByModelKind[model.kind] === testCase.kind) return [];
       return [
-        `${at}: "${id}" is ${article(model.kind)} ${model.kind} model and cannot run a ${testCase.kind} case`,
+        `${at}: "${id}" (${model.kind}) cannot run the ${testCase.kind} case "${testCase.id}"`,
       ];
     }),
   );

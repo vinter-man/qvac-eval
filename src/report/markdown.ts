@@ -15,6 +15,7 @@ function escapeCell(text: string): string {
 
 function code(text: string): string {
   const flat = text.replace(/\s+/gu, ' ').trim();
+  if (flat === '') return '(empty)';
   const longest = Math.max(0, ...(flat.match(/`+/gu) ?? []).map((run) => run.length));
   const fence = '`'.repeat(longest + 1);
   const padding = flat.startsWith('`') || flat.endsWith('`') ? ' ' : '';

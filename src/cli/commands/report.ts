@@ -147,10 +147,20 @@ export async function reportCommand(
   options: ReportOptions,
   deps: CliDeps,
 ): Promise<number> {
-  const groups = await loadGroups(inputs, deps);
-  if (options.plan === undefined) return finish(groups, options, deps);
+  if (options.plan === undefined) return finish(await loadGroups(inputs, deps), options, deps);
   if (options.runner === undefined) throw new UsageError('--plan needs --runner to pick its jobs');
   const plan = parsePlan(await readPlanFile(options.plan, deps), options.plan);
+  const jobs = plan.include.filter((entry) => entry.runner === options.runner);
+  let groups: RunReport[];
+  try {
+    groups = await loadGroups(inputs, deps);
+  } catch (error) {
+    if (!(error instanceof UsageError)) throw error;
+    throw new UsageError(
+      `No report arrived from any of the ${jobs.length} planned jobs of ${options.runner}`,
+      [error.message, ...jobs.map((entry) => `${entry.model} on SDK ${entry.sdks.join(', ')}`)],
+    );
+  }
   return finish(expectPlan(groups, plan, options.runner), options, deps);
 }
 

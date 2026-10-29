@@ -175,10 +175,21 @@ function perfRow(run: ModelRun, compared: ModelComparison | undefined): PerfRow 
   };
 }
 
-function verdictOf(report: RunReport): ReportView['verdict'] {
+function verdictOf(report: RunReport, older: RunReport | undefined): ReportView['verdict'] {
   const { summary } = report;
   const modelsRun = report.models.filter((run) => run.status === 'completed').length;
   const base = `${summary.passed} of ${summary.total} cases passed on ${modelsRun} ${modelsRun === 1 ? 'model' : 'models'}`;
+  const unfinished = report.models.some((run) => run.status === 'infra-error');
+  if (report.verdict === 'error' && !unfinished && older !== undefined) {
+    const missing = older.models
+      .filter((run) => run.status === 'infra-error')
+      .map((run) => run.model.id);
+    return {
+      word: 'Error',
+      tone: 'error',
+      sentence: `${base}. The report of SDK ${older.environment.sdk.version} is incomplete (${missing.join(', ')}), so the comparison is too.`,
+    };
+  }
   if (report.verdict === 'error') {
     return {
       word: 'Error',
@@ -329,7 +340,7 @@ export function buildView(report: RunReport, comparison?: Comparison): ReportVie
   return {
     suite: newer.suite.name,
     comparedAgainst: comparedAgainstOf(newer, olderSdk),
-    verdict: verdictOf(newer),
+    verdict: verdictOf(newer, older),
     sdkLabel: olderSdk === undefined ? `SDK ${newerSdk}` : `SDK ${olderSdk} → ${newerSdk}`,
     platformLabel: runnerLabel(newer),
     compared: older !== undefined,
