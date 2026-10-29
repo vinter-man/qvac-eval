@@ -62,7 +62,7 @@ describe('qvac-eval matrix', () => {
       sdks: ['0.22.0'],
       runners: ['ubuntu-24.04'],
       include: [
-        { model: 'tiny-llm', kind: 'llm', cases: 1, sdk: '0.22.0', runner: 'ubuntu-24.04' },
+        { model: 'tiny-llm', kind: 'llm', cases: 1, sdks: ['0.22.0'], runner: 'ubuntu-24.04' },
       ],
     });
     expect(result.stderr).toContain(
@@ -70,7 +70,7 @@ describe('qvac-eval matrix', () => {
     );
   });
 
-  it('multiplies models by SDK versions and runners and flags a comparison', async () => {
+  it('keeps the SDK versions of a comparison in one job per model and runner, so they share a machine', async () => {
     const result = await plan([
       '--models',
       'tiny-llm,other-llm',
@@ -82,16 +82,18 @@ describe('qvac-eval matrix', () => {
     const parsed = JSON.parse(result.stdout) as {
       compare: boolean;
       sdks: string[];
-      include: { model: string; sdk: string; runner: string }[];
+      include: { model: string; sdks: string[]; runner: string }[];
     };
     expect(parsed.compare).toBe(true);
     expect(parsed.sdks).toEqual(['0.22.0', '0.21.1']);
-    expect(parsed.include).toHaveLength(2 * 2 * 2);
-    expect(parsed.include[0]).toMatchObject({
-      model: 'tiny-llm',
-      sdk: '0.22.0',
-      runner: 'ubuntu-24.04',
-    });
+    expect(parsed.include).toHaveLength(2 * 2);
+    expect(parsed.include[0]).toEqual(
+      expect.objectContaining({
+        model: 'tiny-llm',
+        sdks: ['0.22.0', '0.21.1'],
+        runner: 'ubuntu-24.04',
+      }),
+    );
     expect(result.asked).toContain('view @qvac/sdk@0.21.1 version --json');
   });
 

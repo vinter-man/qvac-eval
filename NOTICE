@@ -1,0 +1,21 @@
+qvac-eval is MIT licensed (LICENSE). It bundles and refers to the following.
+
+Fonts, embedded in the HTML reports (assets/fonts)
+  Onest, Copyright 2021 The Onest Project Authors (https://github.com/googlefonts/onest)
+  Martian Mono, Copyright The Martian Mono Project Authors (https://github.com/evilmartians/mono)
+  Both under the SIL Open Font License 1.1: assets/fonts/OFL-Onest.txt and assets/fonts/OFL-MartianMono.txt.
+
+Audio fixture (fixtures/audio/jfk.wav)
+  The opening of John F. Kennedy's inaugural address, 20 January 1961. A work of the US federal
+  government, in the public domain. The WAV is the sample that ships with whisper.cpp (MIT).
+
+Models
+  qvac-eval downloads no model by itself. The ones listed in models.yaml are fetched by @qvac/sdk
+  from the QVAC model registry and keep their own licenses:
+    SmolLM2-360M-Instruct      Apache-2.0
+    Qwen3-0.6B                 Apache-2.0
+    Llama-3.2-1B-Instruct      Llama 3.2 Community License
+    EmbeddingGemma-300M        Gemma Terms of Use
+    Whisper tiny.en, base.en   Apache-2.0 on Hugging Face (MIT in the OpenAI repository)
+
+@qvac/sdk is Apache-2.0 and is not redistributed here.

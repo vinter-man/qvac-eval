@@ -62,7 +62,10 @@ export async function runCommand(
   const catalog = buildModelCatalog(registry, suite.definition);
   const models = selectModels(options.models, suite.definition, catalog);
 
-  if (deps.env.QVAC_CONFIG_PATH === undefined) {
+  const ownConfig = await firstExisting(
+    ['json', 'js', 'ts'].map((extension) => join(deps.cwd, `qvac.config.${extension}`)),
+  );
+  if (deps.env.QVAC_CONFIG_PATH === undefined && ownConfig === undefined) {
     const modelCacheDir = options.cacheDir ?? deps.env.QVAC_EVAL_MODEL_CACHE;
     deps.env.QVAC_CONFIG_PATH = await writeSdkConfig({
       file: join(deps.cwd, '.qvac-eval', 'qvac.config.json'),

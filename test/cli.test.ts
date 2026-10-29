@@ -231,6 +231,12 @@ describe('run options', () => {
     await expect(access(join(harness.root, '.qvac-eval', 'qvac.config.json'))).rejects.toThrow();
   });
 
+  it('leaves the SDK config of the project alone when it has one', async () => {
+    const harness = await cli(good, { files: { 'qvac.config.json': '{"loggerLevel": "debug"}' } });
+    await harness.run('run', 'cases/demo.yaml');
+    expect(harness.env.QVAC_CONFIG_PATH).toBeUndefined();
+  });
+
   it('runs the models given on the command line instead of the suite default', async () => {
     const harness = await cli(good, {
       files: {

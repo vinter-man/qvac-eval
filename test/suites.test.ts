@@ -276,6 +276,14 @@ describe('config', () => {
   });
 });
 
+describe('the config shipped in this repository', () => {
+  it('spells out exactly the defaults of the schema', async () => {
+    expect(await loadConfig(join(repository, 'qvac-eval.config.yaml'))).toEqual(
+      await loadConfig(undefined),
+    );
+  });
+});
+
 describe('the suites shipped in this repository', () => {
   it('are valid, use known models and point at real fixtures', async () => {
     const registry = await loadModelRegistry(join(repository, 'models.yaml'));

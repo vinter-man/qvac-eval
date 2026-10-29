@@ -23,7 +23,7 @@ export interface MatrixEntry {
   model: string;
   kind: string;
   cases: number;
-  sdk: string;
+  sdks: string[];
   runner: string;
 }
 
@@ -84,15 +84,13 @@ export async function planMatrix(
     sdks,
     runners: options.runners,
     include: options.runners.flatMap((runner) =>
-      sdks.flatMap((sdk) =>
-        eligible.map(({ model, cases }) => ({
-          model: model.id,
-          kind: model.kind,
-          cases,
-          sdk,
-          runner,
-        })),
-      ),
+      eligible.map(({ model, cases }) => ({
+        model: model.id,
+        kind: model.kind,
+        cases,
+        sdks,
+        runner,
+      })),
     ),
   };
 }
