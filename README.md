@@ -2,7 +2,6 @@
 [![Eval](https://github.com/vinter-man/qvac-eval/actions/workflows/eval.yml/badge.svg)](https://github.com/vinter-man/qvac-eval/actions/workflows/eval.yml)
 ![Node 22.17+](https://img.shields.io/badge/node-22.17%2B-blue)
 ![QVAC SDK 0.21 to 0.22](https://img.shields.io/badge/%40qvac%2Fsdk-0.21%20%E2%80%93%200.22-orange)
-![No keys](https://img.shields.io/badge/keys-none-lightgrey)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ![main picture](docs/assets/banner.png)
@@ -17,7 +16,7 @@ On GitHub you press **Run workflow**, pick the models and two SDK versions, and 
 
 ![demo](docs/assets/demo.gif)
 
-Three models, 27 cases, two SDK versions, recorded on my laptop. On the way: **27 of 27 answers came out as the same text on 0.21.1 and 0.22.0**, and the speed moved by single-digit percents.
+Three models, 27 cases, two SDK versions, recorded on my laptop. On the way: **27 of 27 answers came out as the same text on 0.21.1 and 0.22.0**, and tokens per second moved by −9%, −6% and +2%, inside the limits.
 
 ---
 
@@ -30,6 +29,7 @@ Three models, 27 cases, two SDK versions, recorded on my laptop. On the way: **2
   - [Compare two SDK versions](#compare)
   - [Run it on GitHub](#github)
   - [Write your own cases](#cases)
+  - [Use it from your own repository](#own)
 - [Installation](#installation)
 - [Options](#options)
 - [Models](#models)
@@ -50,7 +50,7 @@ Three models, 27 cases, two SDK versions, recorded on my laptop. On the way: **2
 ```bash
 git clone https://github.com/vinter-man/qvac-eval && cd qvac-eval
 npm ci && npm run build
-node dist/cli/index.js run cases/completion.yaml --sdk-version 0.22.0 --repeat 3
+node dist/cli/index.js run cases/completion.yaml --sdk-version 0.22.0 --repeat 3 --out reports/demo
 ```
 
 The first run installs the SDK into `.qvac-eval/sdk/0.22.0` (2 GB, once) and the SDK downloads the weights of the models it needs (from 44 to 773 MB each, once). After that a whole suite takes seconds.
@@ -90,7 +90,7 @@ A case ends in one of four states:
 
 ![diff](docs/assets/failed.png)
 
-Exit codes: **0** everything passed, **1** something failed or regressed, **2** the run could not give a verdict (a model did not download, the worker crashed, the suite file is invalid). A case that hangs is cancelled through the SDK's `cancel` after its timeout, and the model is always unloaded in a `finally`.
+Exit codes: **0** everything passed, **1** something failed or regressed, **2** the run could not give a verdict (a model did not download, the worker crashed, the suite file is invalid, no selected model has a case), **130** interrupted. A case that hangs is cancelled through the SDK's `cancel` after its timeout, and the model is always unloaded in a `finally`.
 
 ### <a name="compare"></a> Compare two SDK versions
 
@@ -104,7 +104,7 @@ node dist/cli/index.js compare reports/completion.0.21.1.*.json reports/completi
 
 ![compare](docs/assets/compare.png)
 
-Hatched bars are the older version, solid ones the newer. Under every number is the old one and the change. Cases show the status in both versions and how similar the text is. It exits with 1 if the newer version is worse than the older one by more than the limits in [`qvac-eval.config.yaml`](qvac-eval.config.yaml).
+Hatched bars are the older version, solid ones the newer. Under every number is the old one and the change; a small triangle marks a change for the worse of more than 5% that is also above the noise floor below. That mark is a hint for the reader. What fails a run are the limits in the config. Cases show the status in both versions and how similar the text is. It exits with 1 if the newer version is worse than the older one by more than the limits in [`qvac-eval.config.yaml`](qvac-eval.config.yaml).
 
 > :hurtrealbad: The golden outputs in `golden/` are recorded per model and per SDK version. A run uses the golden of its own version, else the nearest older one, else the nearest newer one, and the report says which. Text is compared by similarity (0.85 by default), embeddings by the worst cosine (0.98). A drift is a `regressed`, not a `failed`: the answer may be fine, it is different. [ADR 4](docs/adr/0004-golden-outputs-follow-the-sdk-version.md)
 
@@ -130,9 +130,12 @@ It also runs every Monday against `@qvac/sdk@latest`. What you get:
 - caches: npm's download cache per SDK version and the weights per model, so a second run does not download anything;
 - a table in every job summary and one merged report at the end, uploaded as an artifact;
 - the job fails on a regression. Without a second SDK version the baseline is the last green run of `main`;
-- the site: the latest run, a page for every run and a history with tokens per second over time, on GitHub Pages: `https://vinter-man.github.io/qvac-eval/`.
+- the site: the latest run, a page for every run and a history with tokens per second over time, on GitHub Pages: `https://vinter-man.github.io/qvac-eval/`;
+- a job that died before it wrote its report does not vanish: the report job knows the planned matrix and shows the missing model as an infrastructure error, with exit code 2.
 
-To get the page: **Settings, Pages, Source: GitHub Actions**, once. `eval.yml` publishes only from the default branch.
+To get the page: **Settings, Pages, Source: GitHub Actions**, once. `eval.yml` publishes only from the default branch, and it does not rebuild the site when it cannot read the history it published last time, so that one run never replaces the whole history.
+
+![history](docs/assets/history.png)
 
 > :suspect: The permissions are `contents: read` for the whole workflow; the report job adds `actions: read` to download the last green run's artifact, and only the Pages job gets `pages: write` and `id-token: write`. Every action is pinned to a commit SHA, and the inputs reach the shell through `env`, never through `${{ }}` inside a script.
 
@@ -177,7 +180,18 @@ A case does not name a model. A model runs the cases of its own kind, so one sui
 | `embed`      | `dims`, `normalized`, `cosineMin`, `cosineMax`, `ranking`, `golden`, `maxLatencyMs`                                                                      |
 | `transcribe` | `reference` with `werMax`, `contains`, `golden`, `maxLatencyMs`, `maxRealTimeFactor`                                                                     |
 
-At temperature 0 with `--repeat` of 2 or more every completion must give the same text every time. `deterministic: true` forces at least two runs. Audio paths are relative to the working directory.
+At temperature 0 with `--repeat` of 2 or more every completion must give the same text every time. `deterministic: true` forces at least two runs. Audio paths are relative to the working directory. A case may list `models:`; an id that does not exist, or a model of another kind, is an error.
+
+### <a name="own"></a> Use it from your own repository
+
+The tool is a CLI, so it can sit next to anyone's suites:
+
+```bash
+npm i -D github:vinter-man/qvac-eval        # builds itself on install
+npx qvac-eval run cases/my-checks.yaml --sdk-version latest
+```
+
+Keep your `cases/`, `golden/` and `models.yaml` in your repository and copy [`.github/workflows/eval.yml`](.github/workflows/eval.yml) next to them: it reads the suites from `cases/`, so only the paths in its `run` steps need to match your layout. `models.yaml` and `qvac-eval.config.yaml` are looked up in the working directory first and in the package second. The package is not on the npm registry.
 
 ---
 
@@ -210,18 +224,22 @@ qvac-eval report <reports...> [--html f] [--md f] [--summary f] [--baseline p] [
 qvac-eval matrix <suite> [--models a,b] [--sdk latest,0.21.1] [--runners ubuntu-24.04,macos-15]
 ```
 
-| Option            | Default           | What it does                                                                                                   |
-| ----------------- | ----------------- | -------------------------------------------------------------------------------------------------------------- |
-| `--models`        | the suite's list  | ids from `models.yaml`, or inline models of the suite                                                          |
-| `--sdk-version`   | the installed one | installs and uses this version, tags such as `latest` work                                                     |
-| `--repeat`        | `1`               | runs every case n times; medians for the numbers, determinism for the text                                     |
-| `--baseline`      | none              | an earlier report: a file, a folder, or `latest` for the newest in `--out`                                     |
-| `--update-golden` | off               | records the outputs of passing cases that ask for a golden                                                     |
-| `--device`        | `cpu`             | `gpu` forces the GPU, `auto` leaves it to the SDK ([ADR 6](docs/adr/0006-inference-runs-on-cpu-by-default.md)) |
-| `--summary`       | none              | appends Markdown to a file, which is what `$GITHUB_STEP_SUMMARY` wants                                         |
-| `--cache-dir`     | the SDK's own     | where the SDK keeps the weights; `QVAC_EVAL_MODEL_CACHE` does the same                                         |
+| Option            | Default                                | What it does                                                                                                   |
+| ----------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `--models`        | the suite's list                       | ids from `models.yaml`, or inline models of the suite                                                          |
+| `--sdk-version`   | the installed one                      | installs and uses this version, tags such as `latest` work                                                     |
+| `--repeat`        | `1`                                    | runs every case n times; medians for the numbers, determinism for the text                                     |
+| `--baseline`      | none                                   | an earlier report: a file, a folder, or `latest` for the newest in `--out`                                     |
+| `--update-golden` | off                                    | records the outputs of passing cases that ask for a golden                                                     |
+| `--device`        | `cpu`                                  | `gpu` forces the GPU, `auto` leaves it to the SDK ([ADR 6](docs/adr/0006-inference-runs-on-cpu-by-default.md)) |
+| `--summary`       | none                                   | appends Markdown to a file, which is what `$GITHUB_STEP_SUMMARY` wants                                         |
+| `--cache-dir`     | the SDK's own                          | where the SDK keeps the weights; `QVAC_EVAL_MODEL_CACHE` does the same                                         |
+| `--golden-dir`    | `golden`                               | where the golden files live                                                                                    |
+| `--config`        | `./qvac-eval.config.yaml`              | limits and timeouts                                                                                            |
+| `--models-file`   | `./models.yaml`, then the built-in one | the model registry                                                                                             |
+| `--verbose`       | off                                    | shows the SDK's own logs                                                                                       |
 
-`report` takes the reports of several jobs, merges them by SDK version and, given two versions, compares them. `--site` builds the static site that Pages serves.
+`report` takes the reports of several jobs, merges them by SDK version and, given two versions, compares them. `--site` builds the static site that Pages serves and `--previous` carries the history of the last one forward (`--keep` runs, 40 by default). `--plan` and `--runner` complete the reports with the jobs of a `matrix` plan that never reported. `--merged-dir` writes the merged JSON of every version, which is what the next baseline is. `--history-link` links a page back to a history.
 
 The limits live in [`qvac-eval.config.yaml`](qvac-eval.config.yaml):
 
@@ -290,10 +308,10 @@ TypeScript in strict mode, ESM, three dependencies (`commander`, `yaml`, `zod`).
 | `docs/adr/`                      | the reasons, in seven short notes                                                                  |
 
 ```bash
-npm run verify        # eslint, tsc, prettier, 223 tests with coverage
+npm run verify        # eslint, tsc, prettier, knip, the unit tests with coverage
 ```
 
-The unit tests use a fake `ModelRunner` and a fake SDK module with the real shapes, so no model is downloaded: timeouts, `cancel`, a failed load, a crashed worker, golden drift, regressions against a baseline, the exit codes, the HTML escaping (model output is never markup), the filters, the history. The reports are checked in a browser at 1440 and 390 pixels wide, in both themes.
+The unit tests use a fake `ModelRunner` and a fake SDK module with the real shapes, so no model is downloaded: timeouts, `cancel`, a failed load, a crashed worker, golden drift, regressions against a baseline, the exit codes, the escaping of model output in HTML and in Markdown, the history. The filters and the theme switch are a small script that I checked by hand in a browser at 1440 and 390 pixels wide, in both themes.
 
 > :godmode: The whole pipeline, from `npm ci` through two SDK versions to the report and the site, was run in a clean Ubuntu 24.04 container on amd64 with Node 22.17.0, the floor of `engines`, and without `libatomic`. The golden outputs recorded on an M4 Pro held there: no regression against the recorded text and vectors.
 

@@ -43,9 +43,13 @@ const data = {
   completion: terminal(
     'completion',
     'cases/completion.yaml',
-    'qvac-eval run cases/completion.yaml --sdk-version 0.22.0 --repeat 3',
+    'qvac-eval run cases/completion.yaml --sdk-version 0.22.0 --repeat 3 --out reports/demo',
   ),
-  hard: terminal('hard', 'cases/hard.yaml', 'qvac-eval run cases/hard.yaml --sdk-version 0.22.0'),
+  hard: terminal(
+    'hard',
+    'cases/hard.yaml',
+    'qvac-eval run cases/hard.yaml --sdk-version 0.22.0 --out reports/demo-hard',
+  ),
   travel: { report: travel('report-full.png'), compare: travel('compare-full.png') },
   captures: JSON.parse(readFileSync(join(TXT, 'captures.json'), 'utf8')),
 };

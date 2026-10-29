@@ -1,7 +1,7 @@
 {
   "completion": {
     "title": "cases/completion.yaml",
-    "command": "qvac-eval run cases/completion.yaml --sdk-version 0.22.0 --repeat 3",
+    "command": "qvac-eval run cases/completion.yaml --sdk-version 0.22.0 --repeat 3 --out reports/demo",
     "lines": [
       "qvac-eval  suite completion  ·  @qvac/sdk 0.22.0  ·  node v24.22.1  ·  darwin arm64  ·  device cpu",
       "",
@@ -52,7 +52,7 @@
   },
   "hard": {
     "title": "cases/hard.yaml",
-    "command": "qvac-eval run cases/hard.yaml --sdk-version 0.22.0",
+    "command": "qvac-eval run cases/hard.yaml --sdk-version 0.22.0 --out reports/demo-hard",
     "lines": [
       "qvac-eval  suite hard  ·  @qvac/sdk 0.22.0  ·  node v24.22.1  ·  darwin arm64  ·  device cpu",
       "",
@@ -136,7 +136,7 @@
       "file": "history-full.png",
       "title": "history.html",
       "offset": 0,
-      "height": 835
+      "height": 860
     }
   ]
 }
