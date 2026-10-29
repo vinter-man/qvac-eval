@@ -32,8 +32,7 @@
   "files": [
     "dist",
     "assets",
-    "models.yaml",
-    "qvac-eval.config.yaml"
+    "models.yaml"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

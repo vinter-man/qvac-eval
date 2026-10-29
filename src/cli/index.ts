@@ -9,4 +9,8 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   });
 }
 
-process.exit(await main(process.argv.slice(2), createDefaultDeps(controller.signal)));
+const code = await main(process.argv.slice(2), createDefaultDeps(controller.signal));
+process.exitCode = code;
+setTimeout(() => {
+  process.exit(code);
+}, 5000).unref();

@@ -14,9 +14,11 @@ function escapeCell(text: string): string {
 }
 
 function code(text: string): string {
-  const longest = Math.max(0, ...(text.match(/`+/gu) ?? []).map((run) => run.length));
+  const flat = text.replace(/\s+/gu, ' ').trim();
+  const longest = Math.max(0, ...(flat.match(/`+/gu) ?? []).map((run) => run.length));
   const fence = '`'.repeat(longest + 1);
-  return `${fence}${text}${fence}`;
+  const padding = flat.startsWith('`') || flat.endsWith('`') ? ' ' : '';
+  return `${fence}${padding}${flat}${padding}${fence}`;
 }
 
 function fenced(text: string): string[] {

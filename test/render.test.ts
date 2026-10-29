@@ -263,6 +263,26 @@ describe('renderMarkdown', () => {
     expect(outsideCode.split('</details>').length - 1).toBe(1);
   });
 
+  it('keeps a multi-line SDK error and a backtick-edged message inside their code spans', () => {
+    const message = '`edge\n\n</details>\n\n# pwned ![x](https://evil.example/t.png)`';
+    const report = makeReport([
+      makeModel('m', [
+        makeCase('bad', {
+          status: 'errored',
+          error: { kind: 'sdk', message },
+          checks: [{ name: 'jsonSchema', passed: false, detail: message }],
+        }),
+      ]),
+    ]);
+    const markdown = renderMarkdown(buildView(report));
+    const outsideCode = markdown
+      .replace(/^(`{3,})[\s\S]*?^\1$/gmu, '')
+      .replace(/(`+)(?:(?!\1)[\s\S])+?\1/gu, '');
+    expect(outsideCode).not.toMatch(/evil\.example|# pwned/u);
+    expect(outsideCode.split('</details>').length - 1).toBe(1);
+    expect(markdown).toContain('`` `edge </details> # pwned ![x](https://evil.example/t.png)` ``');
+  });
+
   it('shows a model that could not run instead of empty numbers', () => {
     const report = makeReport([
       makeModel(
